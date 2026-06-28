@@ -1,0 +1,29 @@
+[project]
+name = "lore"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "chromadb>=0.5.0",
+    "rank-bm25>=0.2.2",
+    "httpx>=0.27.0",
+    "structlog>=24.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "fastmcp>=2.0.0",
+    "markdown-it-py>=3.0.0",
+    "beautifulsoup4>=4.12.0",
+    "markdownify>=0.13.0",
+    "docs-shared",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.5.0"]
+
+[tool.uv.workspace]
+members = ["docs_shared"]
+
+[tool.uv.sources]
+docs-shared = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
