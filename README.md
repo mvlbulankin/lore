@@ -16,7 +16,7 @@
 | MCP SDK | FastMCP, mounted в FastAPI на `/mcp` |
 | API | FastAPI (REST), uvicorn |
 | HTTP client | httpx с retry (3 retries) |
-| Container | Один образ ~360MB (python:3.12-slim + uv) |
+| Container | Один образ ~360MB (python:3.14-slim + uv) |
 | Pipeline | `data/source/` → `preparers/` → `data/prepared/` → `ingestion/` → ChromaDB |
 
 ## Требования
@@ -24,7 +24,7 @@
 - **Docker** — для контейнера lore
 - **uv** — менеджер пакетов Python (для локальной разработки и подготовки документации)
 - **LM Studio** — запущен локально с моделью `nomic-embed-text-v1.5`
-- **Python 3.12**
+- **Python 3.14**
 
 ---
 

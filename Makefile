@@ -1,4 +1,4 @@
-.PHONY: install lock up down prepare prepare-spark prepare-dry-run ingest ingest-clear logs test clean
+.PHONY: install lock up down rebuild shell prepare prepare-spark prepare-delta prepare-dry-run ingest ingest-clear logs test clean
 
 install:
 	uv sync
@@ -8,6 +8,12 @@ lock:
 
 up:
 	docker compose up -d
+
+rebuild:
+	docker compose up -d --build
+
+shell:
+	docker compose exec lore bash
 
 down:
 	docker compose down
@@ -39,5 +45,5 @@ test:
 clean:
 	docker compose down -v
 	rm -rf data/chroma/* data/bm25.pkl
-	rm -rf data/prepared/delta data/prepared/spark
+	rm -rf data/prepared/delta data/prepared/spark data/prepared/test
 	rm -rf .venv

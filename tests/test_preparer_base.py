@@ -156,3 +156,39 @@ def test_registry_filters_by_framework(tmp_path: Path) -> None:
     run_all(source_root, prepared_root, execute=True, framework="test")
     assert (prepared_root / "test" / "demo.md").exists()
     assert not (prepared_root / "delta").exists()
+
+
+def test_spark_redirect_filter() -> None:
+    from preparers.spark.prepare import _is_useless_stub
+    assert _is_useless_stub("# Redirect\n\nThis document has moved [here](foo.html).\n") is True
+    assert _is_useless_stub('# "Migration Guide"\n\nThis page has moved [here](./streaming/ss-migration-guide.html).\n') is True
+    assert _is_useless_stub("# Real Doc\n\nThis is actual content with meaningful text.\n") is False
+    assert _is_useless_stub("# Spark SQL\n\nThis page gives an overview of all public Spark SQL API.\n") is True
+    assert _is_useless_stub("# Subqueries\n\n**This page is under construction**\n") is True
+    assert _is_useless_stub("# PySpark\n\nThe migration guide is now archived on [this page](foo).\n") is True
+    assert _is_useless_stub("# Debug\n\nSee also the other docs for more info.\n") is False
+
+
+def test_spark_notebook_cell_marker_cleanup() -> None:
+    from preparers.spark.prepare import _clean_notebook_md
+    text = "```python\n[1]:\n```\n\nSome text\n"
+    result = _clean_notebook_md(text)
+    assert "[1]:" not in result
+    assert "```python" not in result
+    assert "Some text" in result
+
+
+def test_spark_empty_fence_cleanup() -> None:
+    from preparers.spark.prepare import _clean_notebook_md
+    text = "```python\n```\n\nSome text\n"
+    result = _clean_notebook_md(text)
+    assert "```python" not in result
+    assert "Some text" in result
+
+
+def test_spark_language_default_python() -> None:
+    from preparers.spark.prepare import _clean_notebook_md
+    text = "```\nprint('hello')\n```\n"
+    result = _clean_notebook_md(text)
+    assert "```python" in result
+    assert "print('hello')" in result

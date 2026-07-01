@@ -25,7 +25,7 @@ from preparers.base import PreparedDoc
 from preparers._atomic import _atomic_publish
 
 
-PYSPIRK_BASE_URL = "https://spark.apache.org/docs/latest/api/python"
+PYSPARK_BASE_URL = "https://spark.apache.org/docs/latest/api/python"
 
 KEEP_PATTERNS: list[str] = [
     # SQL programming and data sources
@@ -195,28 +195,26 @@ KEEP_PATTERNS: list[str] = [
 ]
 
 
-PYSPIRK_PAGES: list[tuple[str, str]] = [
-    ("getting_started/install.html", "pyspark-getting-started-install.md"),
-    ("getting_started/quickstart_df.html", "pyspark-getting-started-quickstart-df.md"),
-    ("getting_started/quickstart_connect.html", "pyspark-getting-started-quickstart-connect.md"),
-    ("getting_started/testing_pyspark.html", "pyspark-getting-started-testing.md"),
-    ("user_guide/dataframes.html", "pyspark-user-guide-dataframes.md"),
-    ("user_guide/touroftypes.html", "pyspark-user-guide-touroftypes.md"),
-    ("user_guide/dataprep.html", "pyspark-user-guide-dataprep.md"),
-    ("user_guide/bugbusting.html", "pyspark-user-guide-bugbusting.md"),
-    ("user_guide/udfandudtf.html", "pyspark-user-guide-udfandudtf.md"),
-    ("user_guide/sql.html", "pyspark-user-guide-sql.md"),
-    ("user_guide/loadandbehold.html", "pyspark-user-guide-loadandbehold.md"),
-    ("tutorial/python_packaging.html", "pyspark-tutorial-python-packaging.md"),
-    ("tutorial/sql/arrow_pandas.html", "pyspark-tutorial-sql-arrow-pandas.md"),
-    ("tutorial/sql/python_udtf.html", "pyspark-tutorial-sql-python-udtf.md"),
-    ("tutorial/sql/python_data_source.html", "pyspark-tutorial-sql-python-data-source.md"),
-    ("tutorial/sql/type_conversions.html", "pyspark-tutorial-sql-type-conversions.md"),
-    ("reference/pyspark.sql/index.html", "pyspark-ref-sql-index.md"),
-    ("reference/pyspark.sql/dataframe.html", "pyspark-ref-sql-dataframe.md"),
-    ("reference/pyspark.sql/functions.html", "pyspark-ref-sql-functions.md"),
-    ("reference/pyspark.ss/index.html", "pyspark-ref-streaming-index.md"),
-    ("reference/pyspark.html", "pyspark-ref-core.md"),
+PYSPARK_PAGES: list[str] = [
+    "getting_started/install.html",
+    "getting_started/quickstart_df.html",
+    "getting_started/quickstart_connect.html",
+    "getting_started/testing_pyspark.html",
+    "user_guide/dataframes.html",
+    "user_guide/touroftypes.html",
+    "user_guide/dataprep.html",
+    "user_guide/bugbusting.html",
+    "user_guide/udfandudtf.html",
+    "user_guide/sql.html",
+    "user_guide/loadandbehold.html",
+    "tutorial/python_packaging.html",
+    "tutorial/sql/arrow_pandas.html",
+    "tutorial/sql/python_udtf.html",
+    "tutorial/sql/python_data_source.html",
+    "tutorial/sql/type_conversions.html",
+    "reference/pyspark.sql/dataframe.html",
+    "reference/pyspark.sql/functions.html",
+    "reference/pyspark.html",
 ]
 
 
@@ -247,6 +245,8 @@ class SparkPreparer:
         else:
             out_name = f"spark-{stem}.md"
         content = clean_jekyll_md(src.read_text(encoding="utf-8"))
+        if _is_useless_stub(content):
+            return None
         return PreparedDoc(relative_path=out_name, content=content)
 
     def cleanup(self) -> None:
@@ -270,8 +270,8 @@ class SparkPreparer:
                 docs.append(doc)
             if self.download_pyspark:
                 with httpx.Client(timeout=30.0, follow_redirects=True) as client:
-                    for url_path, out_name in PYSPIRK_PAGES:
-                        url = f"{PYSPIRK_BASE_URL}/{url_path}"
+                    for url_path in PYSPARK_PAGES:
+                        url = f"{PYSPARK_BASE_URL}/{url_path}"
                         try:
                             r = client.get(url)
                             r.raise_for_status()
@@ -282,6 +282,10 @@ class SparkPreparer:
                         if not md_text.strip():
                             print(f"  [WARN] empty content for {url_path}", file=sys.stderr)
                             continue
+                        if _is_useless_stub(md_text):
+                            print(f"  [SKIP] stub: {url_path}", file=sys.stderr)
+                            continue
+                        out_name = _title_to_filename(_extract_h1(r.text))
                         print(f"  downloaded → {out_name}")
                         docs.append(PreparedDoc(relative_path=out_name, content=md_text))
             return docs
@@ -296,9 +300,9 @@ class SparkPreparer:
             print(f"  [KEEP] {src.name}")
             kept += 1
         if self.download_pyspark:
-            for url_path, out_name in PYSPIRK_PAGES:
-                print(f"  [DL  ] {url_path} → {out_name}")
-        print(f"[spark] ~{kept + len(PYSPIRK_PAGES)} total files")
+            for url_path in PYSPARK_PAGES:
+                print(f"  [DL  ] {url_path}")
+        print(f"[spark] ~{kept + len(PYSPARK_PAGES)} total files")
 
 
 def _strip_frontmatter(content: str) -> str:
@@ -381,6 +385,43 @@ def _strip_include_tags(content: str) -> str:
     return content
 
 
+def _is_useless_stub(content: str) -> bool:
+    """Check if the cleaned content has no meaningful documentation value."""
+    lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
+    text = " ".join(lines).lower()
+    # Only check non-code lines for redirect/placeholder keywords
+    prose_lines = [l for l in lines if not l.startswith("```")]
+    prose_text = " ".join(prose_lines).lower()
+
+    # Redirect / archived pages
+    if any(kw in prose_text for kw in ("has moved", "moved [here]", "archived on")):
+        return True
+    if re.search(r'\bredirect\b', prose_text):
+        return True
+    if "[here](" in prose_text:
+        return True
+
+    # Under construction / placeholder
+    if "under construction" in prose_text:
+        return True
+
+    # Heading-only: mostly headings with no prose
+    if len(lines) >= 5:
+        heading_lines = sum(1 for l in lines if l.startswith("#"))
+        if heading_lines > len(lines) * 0.7 and heading_lines >= 10:
+            return True
+
+    # Tiny stubs: title + single sentence with no real content
+    if len(lines) <= 2:
+        non_heading = [l for l in lines if not l.startswith("#")]
+        if len(non_heading) <= 1:
+            body = " ".join(non_heading).lower()
+            if "overview" in body or "gives an overview" in body:
+                return True
+
+    return False
+
+
 def clean_jekyll_md(content: str) -> str:
     title = _extract_title(content)
     content = _strip_frontmatter(content)
@@ -394,6 +435,106 @@ def clean_jekyll_md(content: str) -> str:
     if title and not text.startswith("# "):
         text = f"# {title}\n\n{text}"
     return text + "\n"
+
+
+def _clean_notebook_html(soup: BeautifulSoup) -> None:
+    """Strip nbsphinx notebook artifacts: nboutput cells, prompts, and cell markers.
+
+    Keeps only the code from input_area elements inside nbinput containers.
+    """
+    for nboutput in soup.find_all("div", class_=re.compile(r"nboutput", re.I)):
+        nboutput.decompose()
+    for prompt in soup.find_all("div", class_=re.compile(r"prompt", re.I)):
+        prompt.decompose()
+    for nbinput in soup.find_all("div", class_=re.compile(r"nbinput", re.I)):
+        input_area = nbinput.find("div", class_=re.compile(r"input_area", re.I))
+        if input_area and input_area != nbinput:
+            highlight = input_area.find("div", class_=re.compile(r"highlight", re.I))
+            if highlight:
+                pre = highlight.find("pre")
+                if pre:
+                    code = pre.get_text()
+                    lang_class = ""
+                    for cls in (input_area.get("class") or []):
+                        if cls.startswith("highlight-"):
+                            lang_class = cls
+                            break
+                    nbinput.clear()
+                    nbinput.append(input_area)
+                    input_area.clear()
+                    input_area["class"] = ["input_area"]
+                    if lang_class:
+                        input_area["class"].append(lang_class)
+                    new_pre = soup.new_tag("pre")
+                    new_pre.string = code
+                    input_area.append(new_pre)
+
+
+def _clean_notebook_md(text: str) -> str:
+    """Post-process markdown from notebook HTML to remove remaining artifacts."""
+    lines = text.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            fence_content: list[str] = [line]
+            lang = stripped[3:].strip()
+            i += 1
+            closed = False
+            while i < len(lines):
+                if lines[i].strip().startswith("```"):
+                    fence_content.append(lines[i])
+                    closed = True
+                    i += 1
+                    break
+                fence_content.append(lines[i])
+                i += 1
+            if not closed:
+                fence_content.append("```")
+
+            inner_lines = fence_content[1:-1]
+            while inner_lines and re.match(r"^\[\d+\]:\s*$", inner_lines[0].strip()):
+                inner_lines = inner_lines[1:]
+            if not inner_lines or not " ".join(l.strip() for l in inner_lines).strip():
+                continue
+            if not lang:
+                lang = "python"
+            result.append(f"```{lang}")
+            result.extend(inner_lines)
+            result.append("```")
+        else:
+            result.append(line)
+            i += 1
+
+    return "\n".join(result)
+
+
+def _title_to_filename(title: str) -> str:
+    """Convert H1 title to a clean filename slug."""
+    slug = title.lower().rstrip('#')
+    # Strip "Chapter N:" prefix
+    slug = re.sub(r'^chapter\s*\d+[:\s-]*', '', slug)
+    # Strip subtitle after " - " (hyphen with spaces on both sides)
+    slug = re.sub(r' - .+', '', slug, count=1)
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    slug = slug.strip('-')
+    slug = re.sub(r'-{2,}', '-', slug)
+    return f"pyspark-{slug}.md"
+
+
+def _extract_h1(html_content: str) -> str:
+    """Extract H1 title from HTML page."""
+    soup = BeautifulSoup(html_content, "html.parser")
+    main = soup.find("main") or soup.find(id="main-content") or soup.find("article")
+    if not main:
+        main = soup.find("body")
+    if not main:
+        return ""
+    title_tag = main.find("h1")
+    return title_tag.get_text(strip=True) if title_tag else ""
 
 
 def html_to_markdown(html_content: str) -> str:
@@ -418,7 +559,9 @@ def html_to_markdown(html_content: str) -> str:
         a.decompose()
     for div in main.find_all("div", class_=re.compile(r"(prev-next|related|toctree)", re.I)):
         div.decompose()
+    _clean_notebook_html(soup)
     md_text = md(str(main), heading_style="ATX")
+    md_text = _clean_notebook_md(md_text)
     md_text = re.sub(r'\n{3,}', '\n\n', md_text)
     md_text = md_text.strip()
     if title and not md_text.startswith("# "):

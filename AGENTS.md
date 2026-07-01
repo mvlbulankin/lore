@@ -18,11 +18,11 @@
 | Embed drift | Detect при старте + warning в логи |
 | Файлы | только `.md` в `data/prepared/{framework}/` |
 | API | FastAPI (REST) + uvicorn |
-| Container | Один образ, python:3.12-slim + uv |
+| Container | Один образ, python:3.14-slim + uv |
 | Re-ingest | Ручной через `docker compose run --rm lore python /app/ingestion/ingest.py` |
 | Web UI | Нет |
 | Machine | 16 GB RAM, RTX 5090 (32 GB VRAM) |
-| Python | 3.12 |
+| Python | 3.14 |
 | Package manager | uv workspace (dev + Docker) |
 | Project layout | Root `pyproject.toml` workspace + `docs_shared/` как member |
 | Подготовка | Per-framework preparer (Protocol), staging + atomic rename, запускается на хосте через uv |
@@ -97,7 +97,7 @@ cd /Users/mvl/code/lore
 
 Создать корневой `.python-version`:
 ```
-3.12
+3.14
 ```
 
 Создать `.env.example`:
@@ -183,7 +183,7 @@ services:
 [project]
 name = "docs-shared"
 version = "0.1.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 dependencies = []
 
 [tool.hatch.build.targets.wheel]
@@ -903,7 +903,7 @@ def health() -> dict:
 ## Шаг 7. `Dockerfile`
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -938,7 +938,7 @@ CMD ["python", "-m", "uvicorn", "app.server:app", "--host", "0.0.0.0", "--port",
 [project]
 name = "lore"
 version = "0.1.0"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.14,<3.15"
 dependencies = [
     "chromadb>=0.5.0",
     "rank-bm25>=0.2.2",

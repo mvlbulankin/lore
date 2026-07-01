@@ -15,6 +15,6 @@ uv run pytest tests/test_preparer_base.py -v  # только preparer contract
 
 ## Требования
 
-- Python 3.12
+- Python 3.14
 - Зависимости из `[dependency-groups].dev` в `pyproject.toml` (`pytest`, `ruff`)
 - `preparers/` импортируется как пакет (через `tests/conftest.py` добавляет корень в `sys.path`)
