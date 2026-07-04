@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 from pathlib import Path
 
-from .registry import discover_all, run_all
+from .registry import discover_all
 
 
 def _default_source_root() -> Path:

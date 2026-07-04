@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import pytest
 
 from ingestion.chunker import (
     Chunk,
     _build_sections,
     _parse_blocks,
-    _split_section,
     make_chunks,
     _HeadingBlock,
     _CodeBlock,
-    _ProseBlock,
 )
 
 

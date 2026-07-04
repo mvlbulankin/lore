@@ -53,6 +53,10 @@ def main() -> None:
         if existing:
             coll.delete(ids=existing)
         log.info("collection_cleared")
+        bm25_path = Path(settings.bm25_path)
+        if bm25_path.exists():
+            bm25_path.unlink()
+            log.info("bm25_cleared", path=str(bm25_path))
 
     if chunks:
         texts = [c.content for c in chunks]

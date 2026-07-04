@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -387,10 +386,9 @@ def _strip_include_tags(content: str) -> str:
 
 def _is_useless_stub(content: str) -> bool:
     """Check if the cleaned content has no meaningful documentation value."""
-    lines = [l.strip() for l in content.strip().split("\n") if l.strip()]
-    text = " ".join(lines).lower()
+    lines = [line.strip() for line in content.strip().split("\n") if line.strip()]
     # Only check non-code lines for redirect/placeholder keywords
-    prose_lines = [l for l in lines if not l.startswith("```")]
+    prose_lines = [line for line in lines if not line.startswith("```")]
     prose_text = " ".join(prose_lines).lower()
 
     # Redirect / archived pages
@@ -407,13 +405,13 @@ def _is_useless_stub(content: str) -> bool:
 
     # Heading-only: mostly headings with no prose
     if len(lines) >= 5:
-        heading_lines = sum(1 for l in lines if l.startswith("#"))
+        heading_lines = sum(1 for line in lines if line.startswith("#"))
         if heading_lines > len(lines) * 0.7 and heading_lines >= 10:
             return True
 
     # Tiny stubs: title + single sentence with no real content
     if len(lines) <= 2:
-        non_heading = [l for l in lines if not l.startswith("#")]
+        non_heading = [line for line in lines if not line.startswith("#")]
         if len(non_heading) <= 1:
             body = " ".join(non_heading).lower()
             if "overview" in body or "gives an overview" in body:
@@ -498,7 +496,7 @@ def _clean_notebook_md(text: str) -> str:
             inner_lines = fence_content[1:-1]
             while inner_lines and re.match(r"^\[\d+\]:\s*$", inner_lines[0].strip()):
                 inner_lines = inner_lines[1:]
-            if not inner_lines or not " ".join(l.strip() for l in inner_lines).strip():
+            if not inner_lines or not " ".join(line.strip() for line in inner_lines).strip():
                 continue
             if not lang:
                 lang = "python"

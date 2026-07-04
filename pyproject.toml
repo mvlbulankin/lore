@@ -25,5 +25,8 @@ members = ["docs_shared"]
 [tool.uv.sources]
 docs-shared = { workspace = true }
 
+[tool.ruff]
+exclude = ["data/source"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["."]

@@ -3,10 +3,7 @@
 import argparse
 import os
 import subprocess
-import random
 import shutil
-import string
-import tempfile
 
 
 def main():
