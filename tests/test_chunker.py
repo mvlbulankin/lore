@@ -390,3 +390,65 @@ print(1)
     title, sections = _build_sections(blocks)
     code_blocks = [b for b in sections[0].blocks if isinstance(b, _CodeBlock)]
     assert code_blocks[0].label == "Python"
+
+
+# ---------------------------------------------------------------------------
+# Parent-child chunking
+# ---------------------------------------------------------------------------
+
+
+def test_parent_id_single_section():
+    md = "# Title\n\n## Section\n\nshort text\n"
+    chunks = make_chunks("fw", "a.md", md)
+    assert len(chunks) == 1
+    assert chunks[0].parent_id == "fw/a.md/Title > Section"
+    assert chunks[0].parent_heading == "Title > Section"
+    assert chunks[0].parent_content is None  # single chunk = no parent needed
+
+
+def test_parent_id_multi_chunk_section():
+    long_text = " ".join(f"Sentence {i}." for i in range(300))
+    md = f"# Title\n\n## Section\n\n{long_text}\n"
+    chunks = make_chunks("fw", "a.md", md, max_words=80, overlap_words=20)
+    assert len(chunks) >= 2
+    for c in chunks:
+        assert c.parent_id == "fw/a.md/Title > Section"
+        assert c.parent_content is not None
+        assert len(c.parent_content) > len(c.content)
+
+
+def test_parent_level_h1_fallback():
+    md = "# Title\n\nno h2 here\n"
+    chunks = make_chunks("fw", "a.md", md)
+    assert chunks[0].parent_id == "fw/a.md/Title"
+    assert chunks[0].parent_heading == "Title"
+
+
+def test_parent_level_param():
+    """parent_level=1 means H1 is the parent boundary."""
+    md = "# Doc\n\n## Section A\n\ntext A\n\n## Section B\n\ntext B\n"
+    chunks = make_chunks("fw", "a.md", md, parent_level=1)
+    for c in chunks:
+        assert c.parent_id == "fw/a.md/Doc"
+
+
+def test_parent_content_concatenation():
+    """Parent content should be concatenation of all child chunks."""
+    long_text = " ".join(f"Sentence {i}." for i in range(300))
+    md = f"# Title\n\n## Section\n\n{long_text}\n"
+    chunks = make_chunks("fw", "a.md", md, max_words=80, overlap_words=20)
+    assert len(chunks) >= 2
+    # All chunks in same parent should have identical parent_content
+    first_parent = chunks[0].parent_content
+    assert first_parent is not None
+    for c in chunks[1:]:
+        if c.parent_id == chunks[0].parent_id:
+            assert c.parent_content == first_parent
+
+
+def test_different_sections_different_parents():
+    md = "# Doc\n\n## A\n\ntext A\n\n## B\n\ntext B\n"
+    chunks = make_chunks("fw", "a.md", md)
+    assert chunks[0].parent_id == "fw/a.md/Doc > A"
+    assert chunks[1].parent_id == "fw/a.md/Doc > B"
+    assert chunks[0].parent_id != chunks[1].parent_id

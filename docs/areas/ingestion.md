@@ -1,18 +1,18 @@
 # Ingestion
 
-**Files:** `ingestion/ingest.py`, `ingestion/chunker.py`, `ingestion/embedder.py`, `ingestion/bm25_index.py`
+**Files:** `ingestion/ingest.py`, `ingestion/chunker.py`, `ingestion/embedder.py`, `ingestion/sparse_builder.py`
 
 ## Workflow (`ingest.py`)
 
 ```
-discover → chunk → embed → upsert ChromaDB → build BM25
+discover → chunk → embed → sparse (TF-IDF) → upsert Qdrant
 ```
 
 1. **Discover** — scan `PREPARED_DIR/{framework}/**/*.md`
-2. **Chunk** — `make_chunks()` per file (code-aware, heading chain, metadata)
+2. **Chunk** — `make_chunks()` per file (code-aware, heading chain, metadata, parent-child)
 3. **Embed** — batch POST to LM Studio `/embeddings` (batch_size=32)
-4. **Upsert** — `coll.upsert(ids, documents, metadatas, embeddings)` into ChromaDB
-5. **BM25** — full rebuild `bm25_index.build(chunks)` → pickle to `BM25_PATH`
+4. **Sparse** — `SparseBuilder.fit_build(texts)` → TF-IDF sparse vectors
+5. **Upsert** — `client.upsert(collection_name, points, wait=True)` into Qdrant (dense + sparse)
 
 ## Embedder
 
@@ -22,34 +22,34 @@ discover → chunk → embed → upsert ChromaDB → build BM25
 - Uses shared `http_client` (3 retries, 60s timeout)
 - Returns flat list of embedding vectors
 
-## BM25 Index
+## Sparse Builder (TF-IDF)
 
-`bm25_index.build(chunks)`:
-- Tokenizes each chunk: `text.split()` → lowercase → strip
-- Builds `BM25Okapi` over the tokenized corpus
-- Pickles `{bm25, ids, meta}` to `BM25_PATH`
-- **Always full rebuild** — no incremental merge
+`sparse_builder.SparseBuilder`:
+- Uses `sklearn.feature_extraction.text.TfidfVectorizer` with `sublinear_tf=True` (BM25-like saturation)
+- `fit_build(texts)` — fit on corpus, return list of `SparseVector(indices, values)`
+- `encode_query(query)` — transform single query string to `SparseVector`
+- `save(path)` / `load(path)` — pickle the fitted vectorizer for query-time reuse
+- Saved to `QDRANT_STORAGE_PATH/sparse_model.pkl`
 
 ## Flags
 
 | Flag | Effect |
 |------|--------|
-| `--framework <name>` | Index only the specified framework. BM25 still rebuilds for ALL frameworks to maintain consistency. |
-| `--clear` | Delete all existing documents from the ChromaDB collection (collection itself is preserved). |
+| `--framework <name>` | Index only the specified framework. Sparse model is rebuilt on all chunks. |
+| `--clear` | Delete all points from the Qdrant collection and remove the sparse model. |
 
 ## Embedding Drift Detection
 
-Two mechanisms check for embedding model changes at different pipeline stages. Both compare the `embedding_model` key stored in ChromaDB collection metadata against `settings.embedding_model`.
+NOTE: Qdrant doesn't store custom metadata on collection config like ChromaDB did.
+`warn_if_embedding_drift()` is kept for compatibility but currently has no-op behavior.
+Consider storing model info in a sidecar JSON file or payload on a special point.
 
-| Function | When | Module | Purpose |
-|----------|------|--------|---------|
-| `warn_if_embedding_drift()` | Ingest time | `docs_shared/guards.py` | Warns before upsert if model changed since last ingest |
-| `verify_embedding_model()` | Server startup | `docs_shared/retriever.py` | Warns at query time if model changed since last ingest |
-
-If either detects a mismatch, it logs `embedding_model_mismatch` with the stored vs configured model names and suggests `make ingest-clear`.
-
-## Metadata Stored in ChromaDB
+## Metadata Stored in Qdrant Payload
 
 Each chunk stores:
 - `framework`, `source_path`, `title`, `heading`, `chunk_index`
 - `is_last_chunk`, `has_code`, `code_languages` (comma-joined), `block_types` (comma-joined)
+- `content` — full chunk text (needed for `_dedup_by_parent` in retriever)
+- `parent_id` — `"framework/path/H1/H2"` parent section identifier
+- `parent_heading` — heading chain of the parent section
+- `parent_content` — full text of all child chunks in the same parent section (empty for single-chunk sections)

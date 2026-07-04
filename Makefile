@@ -44,6 +44,6 @@ test:
 
 clean:
 	docker compose down -v
-	rm -rf data/chroma/* data/bm25.pkl
+	rm -rf data/qdrant_storage/*
 	rm -rf data/prepared/delta data/prepared/spark data/prepared/test
 	rm -rf .venv

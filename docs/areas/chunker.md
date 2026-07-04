@@ -60,7 +60,24 @@ class Chunk:
     has_code: bool         # True if chunk contains code blocks
     code_languages: list[str]  # ["python", "sql"]
     block_types: list[str]     # ["prose", "code", "list"]
+    # Parent-child
+    parent_id: str | None       # "framework/path/H1/H2"
+    parent_heading: str | None  # heading chain of parent section
+    parent_content: str | None  # full parent text (multi-chunk sections only)
 ```
+
+## Parent-Child Chunking
+
+After chunking, each chunk is assigned a parent section based on the heading chain up to `parent_level` (default: 2, i.e., H2).
+
+- **`parent_id`** — unique identifier: `"framework/path/H1 > H2"`
+- **`parent_heading`** — heading chain of the parent section
+- **`parent_content`** — concatenation of all child chunks in the same parent section.
+  Set only when a section is split into 2+ chunks. Single-chunk sections have
+  `parent_content = None` to avoid duplication.
+
+The `parent_level` parameter controls which heading level defines a parent boundary.
+H2 is the default because Spark/Delta docs use H2 as the natural "section" boundary.
 
 ## Configuration
 
@@ -68,3 +85,4 @@ class Chunk:
 |-----------|---------|-------------|
 | `max_words` | 800 | Max words per chunk (code blocks may exceed) |
 | `overlap_words` | 80 | Overlap between prose chunks |
+| `parent_level` | 2 | Heading level defining parent section boundary (1=H1, 2=H2) |

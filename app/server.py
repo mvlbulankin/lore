@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 
-from docs_shared.retriever import HybridRetriever
+from docs_shared.retriever import QdrantRetriever
 from docs_shared.config import settings
 from docs_shared import http_client as shared_http_client
 
@@ -25,7 +25,7 @@ structlog.configure(
     logger_factory=structlog.PrintLoggerFactory(),
 )
 
-retriever = HybridRetriever()
+retriever = QdrantRetriever()
 retriever.verify_embedding_model()
 
 mcp = FastMCP("lore")
@@ -58,6 +58,7 @@ def _to_hit_dict(hits) -> list[dict]:
             "chunk_index": h.chunk_index,
             "score": h.score,
             "snippet": h.content[:500],
+            "parent_content": h.parent_content[:2000] if h.parent_content else None,
         }
         for h in hits
     ]
@@ -96,16 +97,21 @@ def get_doc(framework: str, path: str) -> str:
 
 @app.get("/health")
 def health() -> dict:
-    chroma_ok = retriever.collection_count() >= 0
+    qdrant_ok = retriever.collection_count() >= 0
+    sparse_ok = retriever._sparse_builder is not None
     lm_ok = True
     try:
-        shared_http_client.get(f"{settings.lm_studio_url}/models", headers=settings.lm_studio_headers, timeout=3).raise_for_status()
+        shared_http_client.get(
+            f"{settings.lm_studio_url}/models",
+            headers=settings.lm_studio_headers,
+            timeout=3,
+        ).raise_for_status()
     except Exception:
         lm_ok = False
     return {
-        "chroma": chroma_ok,
+        "qdrant": qdrant_ok,
+        "sparse_model": sparse_ok,
         "lm_studio": lm_ok,
-        "bm25_loaded": retriever.bm25 is not None,
         "collection_count": retriever.collection_count(),
         "embedding_model": settings.embedding_model,
     }

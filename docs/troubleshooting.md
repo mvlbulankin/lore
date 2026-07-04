@@ -7,15 +7,17 @@
 3. Check `LM_STUDIO_URL` — port must match LM Studio settings
 4. Test manually: `curl -H "Authorization: Bearer <token>" http://localhost:1234/v1/models`
 
-## ChromaDB Not Responding
+## Qdrant Storage Issues
 
 1. `docker compose logs lore` — look for initialization errors
-2. Check `collection_count` in `/health` — if > 0, ChromaDB is working
-3. Verify write permissions on `data/chroma/`
+2. Check `collection_count` in `/health` — if > 0, Qdrant is working
+3. Verify write permissions on `data/qdrant_storage/`
+4. Qdrant embedded mode stores data in `QDRANT_STORAGE_PATH` — ensure it exists and is writable
 
 ## Embed Drift Warning
 
-Log message `embedding_model_mismatch` means the embedding model changed but ChromaDB still has old vectors.
+NOTE: Qdrant doesn't store custom metadata on collection config like ChromaDB did.
+`verify_embedding_model()` is currently a no-op. If you change the embedding model, you must manually run:
 
 ```bash
 make ingest-clear
@@ -25,7 +27,7 @@ make ingest-clear
 
 1. Verify `data/prepared/{framework}/` contains `.md` files
 2. Verify documents are indexed: `make ingest`
-3. Check `bm25_loaded: true` in `/health`
+3. Check `sparse_model: true` in `/health`
 4. Check sources: `curl http://localhost:8000/sources`
 
 ## Preparation Finds No Source Files
@@ -52,17 +54,16 @@ docker run --rm alpine nslookup host.docker.internal
 
 Replace with the host machine IP in `LM_STUDIO_URL` if needed.
 
-## BM25 Rebuild on Partial Ingest
+## Sparse Model Rebuild on Partial Ingest
 
-BM25 index is always rebuilt fully on every `make ingest`, even with `--framework`. This ensures BM25 and ChromaDB stay consistent.
+Sparse model (TF-IDF) is always rebuilt fully on every `make ingest`, even with `--framework`. This ensures the sparse model and Qdrant stay consistent.
 
 ## Search Returns 0 Hits After `make ingest`
 
-`HybridRetriever` loads `bm25.pkl` at container startup. After `make ingest`, restart the container:
-
-```bash
-make down && make up
-```
+Qdrant is embedded (in-process) — no restart needed after `make ingest`. If results are empty:
+1. Check that LM Studio is running (embeddings are needed at query time)
+2. Check `collection_count` in `/health`
+3. Verify `sparse_model: true` in `/health`
 
 ## `ModuleNotFoundError: No module named 'docs_shared'`
 

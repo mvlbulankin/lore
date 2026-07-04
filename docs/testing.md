@@ -5,16 +5,19 @@
 ```bash
 make test                                    # all tests
 uv run pytest tests/test_chunker.py -v        # chunker only
-uv run pytest tests/test_preparer_base.py -v  # preparer contract only
-uv run pytest -k "code" -v                    # keyword filter
+uv run pytest tests/test_sparse_builder.py -v # sparse builder only
+uv run pytest tests/test_retriever.py -v      # retriever only
+uv run pytest -k "parent" -v                  # keyword filter
 ```
 
 ## Coverage
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `test_chunker.py` | 25 | Heading chain, H4-labels, code atomicity, prose overlap, `is_last_chunk`, metadata, block parsing |
+| `test_chunker.py` | 31 | Heading chain, H4-labels, code atomicity, prose overlap, `is_last_chunk`, metadata, block parsing, **parent-child chunking** |
 | `test_preparer_base.py` | 16 | Protocol conformance, atomic rename, dry-run, registry discovery, spark preparer helpers |
+| `test_sparse_builder.py` | 6 | TF-IDF fit/build, encode_query, save/load, error handling |
+| `test_retriever.py` | 5 | Qdrant collection, framework filter, prefetch + Fusion.RRF, sparse model, parent dedup |
 
 ## Test Categories
 
@@ -25,6 +28,23 @@ uv run pytest -k "code" -v                    # keyword filter
 - **Prose splitting** — sentence-based split, overlap, section boundary isolation
 - **Metadata** — `is_last_chunk`, sequential indices, title fallback, block types
 - **Block parsing** — `_parse_blocks` returns typed blocks, `_build_sections` attaches H4 labels
+- **Parent-child** — `parent_id` format, multi-chunk `parent_content`, `parent_level` parameter, different sections
+
+### Sparse Builder Tests (`test_sparse_builder.py`)
+
+- **fit_build** — returns correct number of SparseVectors with matching indices/values
+- **build** — transforms new texts after fitting
+- **encode_query** — encodes single query string
+- **save/load** — round-trip persistence preserves query encoding
+- **Error handling** — build/encode before fit raises RuntimeError
+
+### Retriever Tests (`test_retriever.py`)
+
+- **collection_count** — verifies Qdrant upsert
+- **framework_filter** — `MatchValue` filter works correctly
+- **prefetch_fusion_rrf** — `Prefetch` + `FusionQuery(fusion=Fusion.RRF)` returns results
+- **sparse_model** — save/load round-trip works
+- **parent_dedup** — keeps highest-scoring child per parent
 
 ### Preparer Tests (`test_preparer_base.py`)
 
@@ -46,8 +66,10 @@ uv run pytest -k "code" -v                    # keyword filter
 ## Writing New Tests
 
 1. Chunker tests: import from `ingestion.chunker`, use `make_chunks()` with synthetic markdown
-2. Preparer tests: create `_FakePreparer` or use real preparers with `tmp_path` fixtures
-3. Use `pytest.fixture` for temporary directories and source files
+2. Sparse builder tests: import from `ingestion.sparse_builder`, use `SparseBuilder()`
+3. Retriever tests: use QdrantClient with `path=tempfile.TemporaryDirectory()`
+4. Preparer tests: create `_FakePreparer` or use real preparers with `tmp_path` fixtures
+5. Use `pytest.fixture` for temporary directories and source files
 
 ## Pre-commit Checklist
 

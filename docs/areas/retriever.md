@@ -4,29 +4,37 @@
 
 ## Overview
 
-`HybridRetriever` orchestrates BM25 keyword search, ChromaDB vector search, and RRF fusion to produce ranked search results.
+`QdrantRetriever` orchestrates hybrid search using Qdrant's prefetch + FusionQuery for server-side RRF, with parent-child deduplication.
 
 ## Initialization
 
 ```python
-retriever = HybridRetriever()
+retriever = QdrantRetriever()
 ```
 
-Creates a `chromadb.PersistentClient`, opens/creates the collection with `embedding_function=None` (embeddings are computed externally via LM Studio), and loads the BM25 index from disk.
+Creates a `QdrantClient(path=...)` (embedded mode), and loads the sparse TF-IDF model from disk.
 
-## BM25 Search (`_bm25_search`)
+## Hybrid Search (`search`)
 
-- Loads `BM25Okapi` from `data/bm25.pkl` at startup.
-- Tokenization: `text.split()` → lowercase → strip.
-- Computes per-document BM25 scores, filters by `framework` if specified, returns top-k `Hit` objects.
-- If BM25 index is missing, returns empty list (logged as warning).
+1. **Dense query vector** — embed via LM Studio POST to `{LM_STUDIO_URL}/embeddings`
+2. **Sparse query vector** — encode via `SparseBuilder.encode_query()` (TF-IDF)
+3. **Framework filter** — `Filter(must=[FieldCondition(key="framework", match=MatchValue(value=...))])`
+4. **Prefetch** — two sub-queries:
+   - `Prefetch(query=dense_vec, using="dense", limit=fetch_limit)`
+   - `Prefetch(query=sparse_vec, using="sparse", limit=fetch_limit)`
+5. **Fusion** — `query=FusionQuery(fusion=Fusion.RRF)` (server-side RRF)
+6. **Dedup** — `_dedup_by_parent()` keeps highest-scoring child per parent section
 
-## Vector Search (`_vector_search`)
+`fetch_limit = max(limit * 4, 20)` to ensure enough candidates for deduplication.
 
-- Embeds query via `_embed()` → POST to `{LM_STUDIO_URL}/embeddings`.
-- Queries ChromaDB with `where={"framework": ...}` filter if framework specified.
-- Converts cosine distance to similarity: `max(0.0, 1.0 - distance)`.
-- Returns top-k `Hit` objects.
+## Parent-Child Deduplication (`_dedup_by_parent`)
+
+After RRF fusion, multiple child chunks from the same parent section may appear in results.
+Dedup keeps the highest-scoring child per `parent_id`, returning:
+- `content` — the precise child chunk text (where the match was found)
+- `parent_content` — the full parent section text (broader context)
+
+Single-chunk sections have `parent_content = ""` in payload, which falls back to `content`.
 
 ## Embedding (`_embed`)
 
@@ -34,41 +42,28 @@ Creates a `chromadb.PersistentClient`, opens/creates the collection with `embedd
 - Sends batch to LM Studio OpenAI-compatible `/embeddings` endpoint.
 - Returns list of embedding vectors.
 
-## RRF Fusion (`_rrf`)
-
-Reciprocal Rank Fusion combines multiple ranked lists:
-
-```
-score(doc) = Σ 1 / (k + rank_i + 1)
-```
-
-With `k = RRF_K` (default 60). Higher score = better rank.
-
-## Embedding Drift Detection (`verify_embedding_model`)
-
-Compares `embedding_model` from collection metadata against `settings.embedding_model`. If mismatch, logs warning with hint to run `make ingest-clear`.
-
 ## Methods
 
 | Method | Description |
 |--------|-------------|
-| `search(query, framework?, limit=5)` | Hybrid search: BM25(20) + Vector(20) → RRF → top limit |
+| `search(query, framework?, limit=5)` | Hybrid search: dense + sparse → prefetch + Fusion.RRF → parent dedup → top limit |
 | `get_document(framework, path)` | Read `.md` from `prepared_dir/framework/path` |
-| `list_sources()` | Return `{framework: [source_paths]}` from ChromaDB metadata |
-| `collection_count()` | Return number of documents in ChromaDB collection |
-| `reload_bm25()` | Reload BM25 index from disk |
+| `list_sources()` | Return `{framework: [source_paths]}` via Qdrant scroll |
+| `collection_count()` | Return number of points in Qdrant collection |
+| `verify_embedding_model()` | No-op (Qdrant doesn't store custom collection metadata) |
 
 ## Hit Dataclass
 
 ```python
 @dataclass
 class Hit:
-    id: str            # "framework/source_path/chunk_index"
+    id: str            # point ID
     framework: str
     source_path: str
     title: str
     heading: str       # "H1 > H2 > H3" chain
     chunk_index: int
-    content: str
-    score: float
+    content: str       # child chunk (precise match)
+    parent_content: str  # full parent section (context)
+    score: float       # RRF score
 ```

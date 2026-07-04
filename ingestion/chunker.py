@@ -34,6 +34,10 @@ class Chunk:
     has_code: bool = False
     code_languages: list[str] = field(default_factory=list)
     block_types: list[str] = field(default_factory=list)
+    # Parent-child
+    parent_id: str | None = None
+    parent_heading: str | None = None
+    parent_content: str | None = None
 
 
 @dataclass
@@ -354,6 +358,7 @@ def make_chunks(
     raw_text: str,
     max_words: int = 800,
     overlap_words: int = 80,
+    parent_level: int = 2,
 ) -> list[Chunk]:
     blocks = _parse_blocks(raw_text)
     if not blocks:
@@ -406,7 +411,40 @@ def make_chunks(
             code_languages=last.code_languages,
             block_types=last.block_types,
         )
+
+    # Phase 2: attach parent info
+    # Group chunks by parent section (heading chain up to parent_level)
+    parent_groups: dict[str, list[Chunk]] = {}
+    for chunk in chunks:
+        pid = _parent_id(chunk.heading, parent_level)
+        parent_groups.setdefault(pid, []).append(chunk)
+
+    for chunk in chunks:
+        pid = _parent_id(chunk.heading, parent_level)
+        chunk.parent_id = f"{framework}/{path}/{pid}"
+        chunk.parent_heading = pid
+
+        # Build parent content from all chunks in same group
+        parent_chunks = parent_groups[pid]
+        if len(parent_chunks) > 1:
+            chunk.parent_content = "\n\n".join(c.content for c in parent_chunks)
+        # Single-chunk section → parent = child (no duplication needed)
+
     return chunks
+
+
+def _parent_id(heading: str, parent_level: int) -> str:
+    """Compute parent ID from heading chain.
+
+    Splits ' > ' chain and takes first `parent_level` components.
+    Falls back to the full heading if chain is shorter.
+    """
+    if not heading:
+        return ""
+    parts = heading.split(" > ")
+    if len(parts) >= parent_level:
+        return " > ".join(parts[:parent_level])
+    return heading
 
 
 __all__ = ["Chunk", "make_chunks"]
