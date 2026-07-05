@@ -5,13 +5,6 @@ from pydantic_settings import BaseSettings
 
 from .embedder import EMBEDDING_MODEL
 
-KNOWN_MODEL_DIMS = {
-    "BAAI/bge-small-en-v1.5": 384,
-    "BAAI/bge-base-en-v1.5": 768,
-    "nomic-ai/nomic-embed-text-v1.5": 768,
-    "BAAI/bge-large-en-v1.5": 1024,
-}
-
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables.
@@ -36,13 +29,7 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
 
     @model_validator(mode="after")
-    def _validate_dim(self) -> Settings:
-        expected = KNOWN_MODEL_DIMS.get(self.embedding_model)
-        if expected and self.embedding_dim != expected:
-            raise ValueError(
-                f"embedding_dim={self.embedding_dim} does not match "
-                f"known dim {expected} for model {self.embedding_model}"
-            )
+    def _validate_chunks(self) -> Settings:
         if self.chunk_overlap_words >= self.chunk_max_words:
             raise ValueError(
                 f"chunk_overlap_words={self.chunk_overlap_words} must be "

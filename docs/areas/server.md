@@ -11,13 +11,19 @@ Single FastAPI application that mounts FastMCP at `/mcp`. Both MCP tools and RES
 ```python
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
-    if not retriever.verify_embedding_model():
-        log.error("embedding_model_drift_detected", hint="run: make ingest-clear")
-    yield
-    await retriever.aclose()
+    embedder = Embedder()
+    retriever = QdrantRetriever(embedder=embedder)
+    app.state.embedder = embedder
+    app.state.retriever = retriever
+    try:
+        if not retriever.verify_embedding_model():
+            log.error("embedding_model_drift_detected", hint="run: make ingest-clear")
+        yield
+    finally:
+        await retriever.aclose()
 ```
 
-Uses `combine_lifespans(app_lifespan, mcp_app.lifespan)` to manage both FastAPI and FastMCP lifecycles. On startup, verifies embedding model consistency. On shutdown, closes async retriever.
+Uses `combine_lifespans(app_lifespan, mcp_app.lifespan)` to manage both FastAPI and FastMCP lifecycles. On startup, creates embedder and retriever, verifies embedding model consistency. On shutdown, closes async retriever.
 
 ## Structlog
 
@@ -30,6 +36,8 @@ JSON-formatted logs with ISO timestamps, log levels, and exception info. Minimum
 | `search_docs` | `query`, `framework?`, `limit=5` | async. Hybrid dense+sparse search with RRF fusion |
 | `get_document` | `framework`, `path` | Read full `.md` from prepared directory |
 | `list_sources` | — | async. List all indexed frameworks and their source paths |
+
+MCP uses FastMCP's streamable HTTP transport at `/mcp/`. Session management via `Mcp-Session-Id` header.
 
 ## REST Endpoints
 
@@ -55,8 +63,8 @@ class SearchRequest(BaseModel):
 {
   "qdrant": true,
   "sparse_model": true,
-  "collection_count": 1234,
-  "embedding_model": "nomic-ai/nomic-embed-text-v1.5"
+  "collection_count": 3353,
+  "embedding_model": "BAAI/bge-small-en-v1.5"
 }
 ```
 
@@ -77,13 +85,13 @@ MCP tools raise `RuntimeError` with descriptive message on failure.
 Each search result:
 ```json
 {
-  "id": "3",
+  "id": 2234,
   "framework": "spark",
-  "path": "docs/sql.md",
-  "title": "Spark SQL",
-  "heading": "Spark SQL > DataFrame API",
-  "chunk_index": 3,
-  "score": 0.42,
+  "path": "pyspark-quickstart-dataframe.md",
+  "title": "Quickstart: DataFrame",
+  "heading": "Quickstart: DataFrame > DataFrame Creation",
+  "chunk_index": 9,
+  "score": 1.0,
   "snippet": "first 500 chars of content",
   "parent_content": "first 2000 chars of parent section"
 }

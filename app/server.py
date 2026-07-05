@@ -13,7 +13,8 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 
 from docs_shared.config import settings
-from docs_shared.embedder import Embedder, EMBEDDING_MODEL
+from docs_shared.embedder import Embedder
+from docs_shared.embedder import EMBEDDING_MODEL
 from docs_shared.logging import configure_logging
 from docs_shared.retriever import QdrantRetriever, Hit
 from docs_shared.exceptions import DocumentNotFoundError, QdrantError

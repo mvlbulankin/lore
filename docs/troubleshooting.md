@@ -13,13 +13,15 @@
 If mismatch, server logs a warning on startup. Fix with:
 
 ```bash
+make down
 make ingest-clear
+make up
 ```
 
 ## Empty Search Results
 
 1. Verify `data/prepared/{framework}/` contains `.md` files
-2. Verify documents are indexed: `make ingest`
+2. Verify documents are indexed: `make down && make ingest && make up`
 3. Check `sparse_model: true` in `/health`
 4. Check sources: `curl http://localhost:8000/sources`
 
@@ -34,7 +36,9 @@ Verify files are in `data/source/{framework}/` in the format the preparer expect
 New chunker versions may change metadata schema. After updating code:
 
 ```bash
-make ingest-clear && make ingest
+make down
+make ingest-clear
+make up
 ```
 
 ## Sparse Model Rebuild on Partial Ingest
@@ -43,16 +47,29 @@ Sparse model (TF-IDF) is always rebuilt fully on every `make ingest`, even with 
 
 ## Search Returns 0 Hits After `make ingest`
 
-Qdrant is embedded (in-process) — no restart needed after `make ingest`. If results are empty:
-1. Check `collection_count` in `/health`
-2. Verify `sparse_model: true` in `/health`
+Qdrant is embedded (in-process) — the server and ingest cannot run simultaneously. If results are empty:
+1. Ensure server is running: `make up`
+2. Check `collection_count` in `/health`
+3. Verify `sparse_model: true` in `/health`
 
-## fastembed Model Not Loading
+## Qdrant Lock Error: "Storage folder is already accessed by another instance"
 
-On first startup, fastembed downloads the ONNX model to `/data/fastembed_cache`. If it fails:
-1. Check network connectivity (model is downloaded from HuggingFace)
-2. Verify `/data` is writable by the container user
-3. Check logs: `docker compose logs lore`
+This happens when `make ingest` runs while the server container is up. Both try to lock the same Qdrant storage directory.
+
+```bash
+make down              # stop server (releases lock)
+make ingest-clear      # run ingest
+make up                # start server
+```
+
+## Model Download Slow on First Start
+
+On first container start, fastembed downloads the embedding model from HuggingFace Hub (~40MB).
+Subsequent starts use the cached model at `data/hf_cache/`.
+
+1. Check logs: `docker compose logs lore | grep -i "fetching\|download"`
+2. Set `HF_TOKEN` env var for higher rate limits (optional)
+3. Pre-download: run `make shell` and import `fastembed` to trigger download
 
 ## `ModuleNotFoundError: No module named 'docs_shared'`
 
@@ -63,20 +80,3 @@ Container runs as `lore` user with `PYTHONPATH="/app:/app/ingestion"`. Verify:
 ## Preparation: "directory not found"
 
 Verify `data/source/{framework}/` exists. Check path with `make prepare-dry-run`.
-
-## CUDA Provider Unavailable
-
-The container starts but fails with `CudaNotAvailableError`. This means the
-requested ONNX execution provider (default: `CUDAExecutionProvider`) is not
-available inside the container.
-
-1. **nvidia-container-toolkit not installed** — follow Phase 1 instructions in
-   `docs/areas/docker.md` to install and configure the toolkit.
-2. **Docker daemon not restarted** — after installing the toolkit, run
-   `sudo systemctl restart docker`.
-3. **GPU passthrough not working** — verify with:
-   `docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu24.04 nvidia-smi`
-4. **WSL2 driver mismatch** — update Windows NVIDIA driver, run
-   `wsl --update`, then re-enter the WSL distro.
-5. **CPU fallback for development** — set
-   `EMBEDDING_PROVIDERS=CPUExecutionProvider` in `.env`.

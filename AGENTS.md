@@ -4,7 +4,7 @@ Local RAG documentation server with MCP interface for AI agents.
 
 ## Architecture
 
-One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP + fastembed-gpu (ONNX, GPU via CUDAExecutionProvider). Hybrid retrieval: dense vectors + TF-IDF sparse vectors + RRF fusion (server-side). Self-contained — no external dependencies.
+One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP. Dense embeddings via local fastembed/ONNX (no external API, no GPU). TF-IDF sparse vectors via scikit-learn. Hybrid retrieval: dense + sparse + RRF fusion (server-side).
 
 ```
 data/source/ → preparers/ → data/prepared/ → ingestion/ → Qdrant (dense + sparse)
@@ -33,7 +33,7 @@ lore/
 │   ├── config.py               # Settings from env vars
 │   ├── exceptions.py           # Custom exception hierarchy
 │   ├── logging.py              # Shared structlog configuration
-│   ├── embedder.py             # fastembed-gpu embedder (CUDA required)
+│   ├── embedder.py             # FastEmbedEmbedder (local ONNX via fastembed)
 │   ├── retriever.py            # QdrantRetriever, async, dense + sparse + RRF
 │   └── sparse_builder.py       # TF-IDF → Qdrant sparse vectors
 ├── preparers/                  # host-side document preparation
@@ -52,13 +52,18 @@ lore/
 ├── tests/
 │   ├── conftest.py
 │   ├── test_chunker.py         # 35 tests
-│   ├── test_config.py          # 4 tests
-│   ├── test_embedder_local.py  # 12 tests
+│   ├── test_config.py          # 2 tests
+│   ├── test_embedder.py        # 7 tests
+│   ├── test_ingest.py          # 17 tests
+│   ├── test_integration.py     # 5 tests
+│   ├── test_mcp_tools.py       # 2 tests
 │   ├── test_preparer_base.py   # 12 tests
 │   ├── test_sparse_builder.py  # 6 tests
-│   └── test_retriever.py       # 8 tests
+│   ├── test_retriever.py       # 8 tests
+│   └── test_server.py          # 8 tests
 ├── docs/
 │   ├── areas/                  # per-component documentation
+│   │   ├── embedder.md
 │   │   ├── retriever.md
 │   │   ├── chunker.md
 │   │   ├── preparers.md
@@ -70,6 +75,8 @@ lore/
 │   ├── testing.md
 │   ├── troubleshooting.md
 │   └── context-index.md
+├── plans/
+│   └── fastembed-migration.md
 └── skills/
     └── lore-server/SKILL.md    # external agent skill
 ```
@@ -98,9 +105,8 @@ lore/
 
 | Variable | Description | Default |
 |---------|-------------|---------|
-| `EMBEDDING_MODEL` | Embedding model name | `BAAI/bge-small-en-v1.5` |
+| `EMBEDDING_MODEL` | Embedding model name (fastembed-compatible) | `BAAI/bge-small-en-v1.5` |
 | `EMBEDDING_DIM` | Embedding vector dimension | `384` |
-| `EMBEDDING_PROVIDERS` | ONNX execution providers | `CUDAExecutionProvider` |
 | `QDRANT_STORAGE_PATH` | Qdrant embedded storage path | `/data/qdrant_storage` |
 | `QDRANT_COLLECTION` | Qdrant collection name | `docs` |
 | `PREPARED_DIR` | Prepared docs path | `/data/prepared` |
@@ -118,7 +124,7 @@ lore/
 
 1. **One container** — no inter-service networking, simpler operations
 2. **Qdrant embedded** — in-process, no separate DB container, dense + sparse + RRF in one
-3. **In-process embeddings** — fastembed-gpu (ONNX, GPU via CUDAExecutionProvider), hard-fail if absent
+3. **Local embeddings** — FastEmbedEmbedder uses ONNX via fastembed, no external API or GPU needed
 4. **TF-IDF sparse vectors** — BM25-like keyword search via scikit-learn, native in Qdrant
 5. **Parent-child chunking** — small chunks for precision, parent content for context
 6. **Atomic preparer publish** — staging + rename, ingest always sees consistent snapshot
@@ -150,7 +156,7 @@ lore/
 ## Rules for Agents
 
 - **DO NOT** modify `data/source/` — it is read-only raw documentation
-- **DO NOT** run `make ingest` without confirmation — first startup downloads ONNX model
+- **DO NOT** run `make ingest` without confirmation — needs server stopped (Qdrant lock)
 - **ALWAYS** run `make prepare` before `make ingest` when source files change
 - **ALWAYS** run `make test` after code changes
 - **ALWAYS** run `uv run ruff check` after Python changes

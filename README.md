@@ -5,25 +5,24 @@
 
 Локальный RAG-сервер документации с MCP-интерфейсом для агентов.
 
-Один Docker-контейнер: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP + fastembed-gpu (ONNX).
+Один Docker-контейнер: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP.
+Эмбеддинги через local fastembed/ONNX (без внешнего API, без GPU).
 
 ## Архитектура
 
 | Слой | Решение |
 |------|---------|
 | Vector DB | Qdrant embedded `AsyncQdrantClient` (in-process) |
-| Embedding | `BAAI/bge-small-en-v1.5` (384 dims) через fastembed-gpu (ONNX, CUDA) |
+| Embedding | Local fastembed/ONNX (via fastembed, без GPU) |
 | Retrieval | Hybrid: TF-IDF sparse + dense embeddings + RRF (server-side via Qdrant prefetch + FusionQuery) |
 | Chunking | Code-aware: H1>H2>H3 chain, atomic code-fence, prose с overlap |
-| Container | Один образ ~400MB (python:3.14-slim + uv) |
+| Container | Один образ ~500MB (python:3.14-slim + uv + ONNX runtime) |
 | Pipeline | `data/source/` → `preparers/` → `data/prepared/` → `ingestion/` → Qdrant |
 
 ## Требования
 
 - **Docker** — для контейнера lore
 - **uv** — менеджер пакетов Python
-- **nvidia-container-toolkit** — для GPU-ускорения ONNX
-- **NVIDIA GPU + драйвер** — CUDA 12/13 совместимый
 - **Python 3.14**
 
 ## Quick Start
@@ -68,7 +67,8 @@ curl -X POST http://localhost:8000/search \
 
 | Файл | Описание |
 |------|----------|
-| [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, TF-IDF sparse, Qdrant, RRF |
+| [docs/areas/embedder.md](docs/areas/embedder.md) | FastEmbedEmbedder, local ONNX |
+| [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, hybrid dense+sparse, RRF, parent-child dedup |
 | [docs/areas/chunker.md](docs/areas/chunker.md) | Code-aware chunking |
 | [docs/areas/preparers.md](docs/areas/preparers.md) | FrameworkPreparer, pipeline |
 | [docs/areas/ingestion.md](docs/areas/ingestion.md) | Ingest workflow, embedder |

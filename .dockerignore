@@ -1,12 +1,12 @@
 .venv
 __pycache__
 *.pyc
-*.pyo
 *.egg-info
 *.lock
 !uv.lock
-data/chroma
-data/bm25.pkl
+data/qdrant_storage/
+data/prepared/
+data/hf_cache/
 .git
 AGENTS.md
 Makefile

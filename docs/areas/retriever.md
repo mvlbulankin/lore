@@ -12,31 +12,29 @@
 from docs_shared.embedder import Embedder
 from docs_shared.retriever import QdrantRetriever
 
-embedder = Embedder(cache_dir="/data/fastembed_cache")
+embedder = Embedder()
 retriever = QdrantRetriever(embedder=embedder)
 ```
 
-Creates an `AsyncQdrantClient(path=...)` (embedded mode) and loads the sparse TF-IDF model from disk. The embedder is passed in (in-process ONNX, no HTTP calls).
+Creates an `AsyncQdrantClient(path=...)` (embedded mode) and loads the sparse TF-IDF model from disk. The embedder is passed in (local fastembed/ONNX inference).
 
 ## Async Methods
 
-`search()`, `list_sources()`, `collection_count()` are async. Use `await`.
-`get_document()` and `verify_embedding_model()` remain sync (filesystem operations).
-
-Close resources on shutdown: `await retriever.aclose()`
+`search()`, `list_sources()`, `collection_count()`, `aclose()` are async. Use `await`.
+`get_document()`, `verify_embedding_model()`, `is_sparse_model_loaded()` are sync (filesystem operations).
 
 ## Hybrid Search (`search`)
 
-1. **Dense query vector** — embed via in-process fastembed (`self._embedder.embed_one(query)`)
+1. **Dense query vector** — embed via fastembed (`self._embedder.embed_one(query)`)
 2. **Sparse query vector** — encode via `SparseBuilder.encode_query()` (TF-IDF)
 3. **Framework filter** — `Filter(must=[FieldCondition(key="framework", match=MatchValue(value=...))])`
-4. **Prefetch** — two sub-queries:
-   - `Prefetch(query=dense_vec, using="dense", limit=fetch_limit)`
-   - `Prefetch(query=sparse_vec, using="sparse", limit=fetch_limit)`
+4. **Prefetch** — two sub-queries (filter applied per-Prefetch for qdrant-client >= 1.18):
+   - `Prefetch(query=dense_vec, using="dense", limit=fetch_limit, filter=qfilter)`
+   - `Prefetch(query=sparse_vec, using="sparse", limit=fetch_limit, filter=qfilter)`
 5. **Fusion** — `query=FusionQuery(fusion=Fusion.RRF)` (server-side RRF)
 6. **Dedup** — `_dedup_by_parent()` keeps highest-scoring child per parent section
 
-`fetch_limit = max(limit * 4, 20)` to ensure enough candidates for deduplication.
+`fetch_limit = max(limit * settings.search_fetch_multiplier, settings.search_fetch_min)` to ensure enough candidates for deduplication.
 
 ## Parent-Child Deduplication (`_dedup_by_parent`)
 
@@ -52,10 +50,11 @@ Single-chunk sections have `parent_content = ""` in payload, which falls back to
 | Method | Description |
 |--------|-------------|
 | `search(query, framework?, limit=5)` | async. Hybrid search: dense + sparse -> prefetch + Fusion.RRF -> parent dedup -> top limit |
-| `get_document(framework, path)` | Read `.md` from `prepared_dir/framework/path` |
-| `list_sources()` | async. Return `{framework: [source_paths]}` via Qdrant scroll |
+| `get_document(framework, path)` | Read `.md` from `prepared_dir/framework/path`. Path traversal protection. |
+| `list_sources()` | async. Return `{framework: [source_paths]}` via Qdrant scroll (paginated, 1000 per page) |
 | `collection_count()` | async. Return number of points in Qdrant collection |
 | `verify_embedding_model()` | Read `.model_info.json` sidecar, compare with current settings. Returns `True` if consistent. |
+| `is_sparse_model_loaded()` | Returns `True` if sparse (TF-IDF) model was loaded successfully |
 | `aclose()` | async. Close AsyncQdrantClient |
 
 ## Error Handling
@@ -65,7 +64,7 @@ The retriever raises custom exceptions:
 | Exception | When |
 |-----------|------|
 | `QdrantError` | Qdrant operation fails (in `collection_count`, `list_sources`) |
-| `DocumentNotFoundError` | File not found in prepared directory (in `get_document`) |
+| `DocumentNotFoundError` | File not found in prepared directory or path traversal detected (in `get_document`) |
 
 All exceptions inherit from `LoreError`.
 
@@ -74,13 +73,13 @@ All exceptions inherit from `LoreError`.
 ```python
 @dataclass
 class Hit:
-    id: str            # point ID
+    id: int | str        # point ID
     framework: str
     source_path: str
     title: str
-    heading: str       # "H1 > H2 > H3" chain
+    heading: str         # "H1 > H2 > H3" chain
     chunk_index: int
-    content: str       # child chunk (precise match)
+    content: str         # child chunk (precise match)
     parent_content: str  # full parent section (context)
-    score: float       # RRF score
+    score: float         # RRF score
 ```

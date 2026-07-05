@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import gc
 import json
-import os
 import pickle
 from pathlib import Path
 
@@ -27,17 +26,6 @@ from docs_shared.sparse_builder import SparseBuilder
 
 configure_logging()
 log = structlog.get_logger()
-
-
-def _mem_mb() -> float:
-    try:
-        with open(f"/proc/{os.getpid()}/status") as f:
-            for line in f:
-                if line.startswith("VmRSS:"):
-                    return int(line.split()[1]) / 1024
-    except Exception:
-        pass
-    return 0
 
 
 def _cache_filename(fw: str, rel: str) -> str:
@@ -161,94 +149,56 @@ def main() -> None:
     sparse_builder.save(sparse_path)
 
     # Initialize single embedder for entire run
-    embedder: Embedder | None = None
-    try:
-        embedder = Embedder(model_name=EMBEDDING_MODEL)
-        log.info("embedder_initialized", model=EMBEDDING_MODEL)
+    embedder = Embedder(model_name=EMBEDDING_MODEL)
+    log.info("embedder_initialized", model=EMBEDDING_MODEL)
 
-        # Phase 4: process per-framework to limit memory
-        frameworks = list(set(fw for fw, _ in files))
+    try:
+        # Phase 4: process one document at a time
         point_id = 0
         total_upserted = 0
 
-        for fw in frameworks:
-            fw_files = [(f, r) for f, r in files if f == fw]
-            if not fw_files:
+        for fw, rel in files:
+            cache_path = cache_files.pop((fw, rel))
+            chunks: list[Chunk] = pickle.loads(cache_path.read_bytes())
+            cache_path.unlink(missing_ok=True)
+
+            if not chunks:
                 continue
 
-            log.info("processing_framework", framework=fw, files=len(fw_files))
+            log.info("processing_file", framework=fw, file=rel, chunks=len(chunks))
 
-            # Load chunks from pickle cache for this framework
-            fw_chunks: list[Chunk] = []
-            for _, rel in fw_files:
-                cache_path = cache_files.pop((fw, rel))
-                fw_chunks.extend(pickle.loads(cache_path.read_bytes()))
-                cache_path.unlink(missing_ok=True)
+            for chunk in chunks:
+                dense_vec = embedder.embed_sync([chunk.content])[0]
+                sparse_vec = sparse_builder.build([chunk.content])[0]
 
-            if not fw_chunks:
-                continue
+                point = PointStruct(
+                    id=point_id,
+                    vector={
+                        "dense": dense_vec,
+                        "sparse": sparse_vec,
+                    },
+                    payload={
+                        "framework": chunk.framework,
+                        "source_path": chunk.source_path,
+                        "title": chunk.title,
+                        "heading": chunk.heading,
+                        "chunk_index": chunk.chunk_index,
+                        "content": chunk.content,
+                        "is_last_chunk": chunk.is_last_chunk,
+                        "has_code": chunk.has_code,
+                        "code_languages": ",".join(chunk.code_languages),
+                        "block_types": ",".join(chunk.block_types),
+                        "parent_id": chunk.parent_id or "",
+                        "parent_heading": chunk.parent_heading or "",
+                        "parent_content": chunk.parent_content or "",
+                    },
+                )
+                client.upsert(collection_name=collection, points=[point], wait=True)
+                point_id += 1
+                total_upserted += 1
 
-            # Build embeddings in a single batch per framework
-            log.info(
-                "before_embed",
-                framework=fw,
-                chunks=len(fw_chunks),
-                mem_mb=round(_mem_mb()),
-            )
-            fw_embeddings = embedder.embed_sync([c.content for c in fw_chunks])
-            log.info(
-                "embeddings_done",
-                framework=fw,
-                count=len(fw_embeddings),
-                mem_mb=round(_mem_mb()),
-            )
-
-            # Build sparse vectors
-            fw_sparse_texts = [c.content for c in fw_chunks]
-            fw_sparse_vectors = sparse_builder.build(fw_sparse_texts)
-            del fw_sparse_texts
-
-            # Upsert in batches
-            batch_size = settings.ingest_batch_size
-            for start in range(0, len(fw_chunks), batch_size):
-                batch_chunks = fw_chunks[start : start + batch_size]
-                batch_emb = fw_embeddings[start : start + batch_size]
-                batch_sparse = fw_sparse_vectors[start : start + batch_size]
-
-                points = []
-                for i, chunk in enumerate(batch_chunks):
-                    point = PointStruct(
-                        id=point_id,
-                        vector={
-                            "dense": batch_emb[i],
-                            "sparse": batch_sparse[i],
-                        },
-                        payload={
-                            "framework": chunk.framework,
-                            "source_path": chunk.source_path,
-                            "title": chunk.title,
-                            "heading": chunk.heading,
-                            "chunk_index": chunk.chunk_index,
-                            "content": chunk.content,
-                            "is_last_chunk": chunk.is_last_chunk,
-                            "has_code": chunk.has_code,
-                            "code_languages": ",".join(chunk.code_languages),
-                            "block_types": ",".join(chunk.block_types),
-                            "parent_id": chunk.parent_id or "",
-                            "parent_heading": chunk.parent_heading or "",
-                            "parent_content": chunk.parent_content or "",
-                        },
-                    )
-                    points.append(point)
-                    point_id += 1
-
-                client.upsert(collection_name=collection, points=points, wait=True)
-                total_upserted += len(points)
-                del points, batch_chunks, batch_emb, batch_sparse
-
-            fw_chunk_count = len(fw_chunks)
-            del fw_chunks, fw_embeddings, fw_sparse_vectors
-            log.info("framework_done", framework=fw, chunks=fw_chunk_count)
+            del chunks
+            log.info("file_done", framework=fw, file=rel)
 
         del sparse_builder
 

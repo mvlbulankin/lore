@@ -7,7 +7,7 @@ description: Local RAG documentation server for Spark, Delta and other framework
 
 ## Overview
 
-Lore is a local RAG server that indexes framework documentation (Spark, Delta) and serves search via REST API and MCP. Uses hybrid retrieval: TF-IDF sparse + dense embeddings (fastembed ONNX) via Qdrant prefetch + Fusion.RRF. Self-contained — no external dependencies.
+Lore is a local RAG server that indexes framework documentation (Spark, Delta) and serves search via REST API and MCP. Uses hybrid retrieval: TF-IDF sparse + dense embeddings (local fastembed/ONNX) via Qdrant prefetch + Fusion.RRF.
 
 ## When to Use
 
@@ -65,13 +65,13 @@ Search returns an array of hits:
 ```json
 [
   {
-    "id": "spark/docs/sql.md/3",
+    "id": 2234,
     "framework": "spark",
-    "path": "docs/sql.md",
-    "title": "Spark SQL",
-    "heading": "Spark SQL > DataFrame API > Joins",
-    "chunk_index": 3,
-    "score": 0.42,
+    "path": "pyspark-quickstart-dataframe.md",
+    "title": "Quickstart: DataFrame",
+    "heading": "Quickstart: DataFrame > DataFrame Creation",
+    "chunk_index": 9,
+    "score": 1.0,
     "snippet": "first 500 characters of matching content...",
     "parent_content": "first 2000 chars of parent section context"
   }
@@ -83,8 +83,8 @@ Search returns an array of hits:
 | Mistake | Fix |
 |---------|-----|
 | Search returns wrong framework | Use `framework` parameter in request |
-| Embed drift warning | Run `make ingest-clear` |
-| fastembed model not loading | Check network, verify `/data` is writable |
+| Embed drift warning | Run `make down && make ingest-clear && make up` |
+| Qdrant lock error | Run `make down`, then `make ingest-clear`, then `make up` |
 
 ## Best Practices
 
@@ -92,4 +92,4 @@ Search returns an array of hits:
 2. Use `framework` parameter to narrow search scope
 3. Keep `limit` reasonable (5-20) for relevance
 4. After code changes to chunking, run `make ingest-clear`
-5. Reindex after adding new source files: `make prepare && make ingest`
+5. Reindex after adding new source files: `make prepare && make down && make ingest-clear && make up`

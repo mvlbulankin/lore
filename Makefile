@@ -42,8 +42,13 @@ logs:
 test:
 	uv run pytest --cov=app --cov=docs_shared --cov=ingestion --cov=preparers --cov-report=term-missing
 
+ruff:
+	uv run ruff check --fix
+
 clean:
 	docker compose down -v
 	rm -rf data/qdrant_storage/*
 	rm -rf data/prepared/delta data/prepared/spark data/prepared/test
+	rm -rf data/hf_cache
+	rm -f data/bm25.pkl
 	rm -rf .venv

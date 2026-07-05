@@ -44,7 +44,7 @@ class QdrantRetriever:
     """Hybrid search: dense (semantic) + sparse (keyword) -> RRF fusion -> parent dedup.
 
     Uses Qdrant prefetch + FusionQuery for server-side RRF.
-    Dense vector via fastembed (ONNX), sparse vector via TF-IDF (scikit-learn).
+    Dense vector via FastEmbedEmbedder (local ONNX), sparse vector via TF-IDF (scikit-learn).
     """
 
     def __init__(self, embedder: Embedder | None = None) -> None:
@@ -69,7 +69,7 @@ class QdrantRetriever:
         limit: int = 5,
     ) -> list[Hit]:
         """Hybrid search: prefetch dense + sparse -> Fusion.RRF -> parent dedup."""
-        # Dense query vector via fastembed
+        # Dense query vector via FastEmbedEmbedder
         dense_vec = await self._embedder.embed_one(query)
 
         # Sparse query vector via TF-IDF
