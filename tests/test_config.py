@@ -8,11 +8,10 @@ from docs_shared.config import Settings
 
 
 def test_settings_new_env_vars_have_defaults() -> None:
-    """New env vars snippet_max_chars, ingest_batch_size etc have defaults."""
+    """New env vars snippet_max_chars etc have defaults."""
     s = Settings()
     assert s.snippet_max_chars == 500
     assert s.parent_content_max_chars == 2000
-    assert s.ingest_batch_size == 256
     assert s.search_fetch_multiplier == 4
     assert s.search_fetch_min == 20
 

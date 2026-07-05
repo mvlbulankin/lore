@@ -76,7 +76,6 @@ def _make_settings(prepared_dir: str, qdrant_path: str) -> Settings:
         qdrant_storage_path=qdrant_path,
         qdrant_collection="test_docs",
         prepared_dir=prepared_dir,
-        server_port=8000,
         chunk_max_words=800,
         chunk_overlap_words=80,
         parent_level=2,

@@ -21,7 +21,7 @@ Creates an `AsyncQdrantClient(path=...)` (embedded mode) and loads the sparse TF
 ## Async Methods
 
 `search()`, `list_sources()`, `collection_count()`, `aclose()` are async. Use `await`.
-`get_document()`, `verify_embedding_model()`, `is_sparse_model_loaded()` are sync (filesystem operations).
+`get_document()`, `verify_embedding_model()`, `is_sparse_model_loaded()` are sync.
 
 ## Hybrid Search (`search`)
 
@@ -43,7 +43,7 @@ Dedup keeps the highest-scoring child per `parent_id`, returning:
 - `content` — the precise child chunk text (where the match was found)
 - `parent_content` — the full parent section text (broader context)
 
-Single-chunk sections have `parent_content = ""` in payload, which falls back to `content`.
+Single-chunk sections have `parent_content = None` in the chunk, serialized as `""` in Qdrant payload. The retriever falls back to `content` when `parent_content` is empty.
 
 ## Methods
 

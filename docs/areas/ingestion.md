@@ -30,6 +30,7 @@ discover → chunk → pickle cache → TF-IDF fit → per-file: reload → embe
 - `embed_one(text)` — async single-text embedding
 - One Embedder instance per ingest run, reused across all files
 - First run downloads model from HuggingFace Hub to `HF_HOME`
+- Model name comes from `settings.embedding_model` (env var `EMBEDDING_MODEL` via Settings)
 
 ## Memory Optimization
 
@@ -52,7 +53,7 @@ in a `finally` block, ensuring no stale files remain after success or failure.
 - Uses `sklearn.feature_extraction.text.TfidfVectorizer` with `sublinear_tf=True` (BM25-like saturation)
 - `fit_build(texts)` — fit on corpus, return list of `SparseVector(indices, values)`
 - `encode_query(query)` — transform single query string to `SparseVector`
-- `save(path)` / `load(path)` — pickle the fitted vectorizer for query-time reuse
+- `save(path)` / `load(path)` — joblib the fitted vectorizer for query-time reuse
 - Saved to `QDRANT_STORAGE_PATH/sparse_model.pkl`
 
 ## Flags

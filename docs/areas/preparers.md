@@ -40,11 +40,10 @@ class PreparedDoc:
 
 `_atomic_publish()` in `_atomic.py` ensures consistency:
 1. Build all output in a staging directory
-2. Rename old `prepared_dir` to `_backup_{name}`
+2. Remove old `prepared_dir`
 3. Rename staging to `prepared_dir`
-4. Delete backup
 
-This guarantees that `make ingest` always reads a consistent snapshot.
+This guarantees that `make ingest` always reads a consistent snapshot. No backup is kept — a crash between removal and rename is safe since the next run rebuilds staging from scratch.
 
 ## Built-in Preparers
 

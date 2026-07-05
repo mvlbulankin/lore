@@ -19,7 +19,7 @@ from qdrant_client.models import (
 )
 
 from docs_shared.config import settings
-from docs_shared.embedder import Embedder, EMBEDDING_MODEL
+from docs_shared.embedder import Embedder
 from docs_shared.logging import configure_logging
 from ingestion.chunker import Chunk, make_chunks
 from docs_shared.sparse_builder import SparseBuilder
@@ -149,8 +149,8 @@ def main() -> None:
     sparse_builder.save(sparse_path)
 
     # Initialize single embedder for entire run
-    embedder = Embedder(model_name=EMBEDDING_MODEL)
-    log.info("embedder_initialized", model=EMBEDDING_MODEL)
+    embedder = Embedder(model_name=settings.embedding_model)
+    log.info("embedder_initialized", model=settings.embedding_model)
 
     try:
         # Phase 4: process one document at a time
@@ -209,7 +209,7 @@ def main() -> None:
         with open(model_info_path, "w") as f:
             json.dump(
                 {
-                    "embedding_model": EMBEDDING_MODEL,
+                    "embedding_model": settings.embedding_model,
                     "embedding_dim": settings.embedding_dim,
                 },
                 f,

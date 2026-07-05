@@ -17,13 +17,13 @@ class Settings(BaseSettings):
     qdrant_storage_path: str = "/data/qdrant_storage"
     qdrant_collection: str = "docs"
     prepared_dir: str = "/data/prepared"
-    server_port: int = Field(default=8000, gt=0)
+
     chunk_max_words: int = Field(default=800, gt=0)
     chunk_overlap_words: int = 80
     parent_level: int = 2
     snippet_max_chars: int = Field(default=500, gt=0)
     parent_content_max_chars: int = Field(default=2000, gt=0)
-    ingest_batch_size: int = Field(default=256, gt=0)
+
     search_fetch_multiplier: int = Field(default=4, gt=0)
     search_fetch_min: int = Field(default=20, gt=0)
     cors_origins: str = "*"

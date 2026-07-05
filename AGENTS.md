@@ -55,12 +55,12 @@ lore/
 │   ├── test_config.py          # 2 tests
 │   ├── test_embedder.py        # 7 tests
 │   ├── test_ingest.py          # 17 tests
-│   ├── test_integration.py     # 5 tests
-│   ├── test_mcp_tools.py       # 2 tests
+│   ├── test_integration.py     # 7 tests
+│   ├── test_mcp_tools.py       # 7 tests
 │   ├── test_preparer_base.py   # 12 tests
 │   ├── test_sparse_builder.py  # 6 tests
 │   ├── test_retriever.py       # 8 tests
-│   └── test_server.py          # 8 tests
+│   └── test_server.py          # 9 tests
 ├── docs/
 │   ├── areas/                  # per-component documentation
 │   │   ├── embedder.md
@@ -110,15 +110,14 @@ lore/
 | `QDRANT_STORAGE_PATH` | Qdrant embedded storage path | `/data/qdrant_storage` |
 | `QDRANT_COLLECTION` | Qdrant collection name | `docs` |
 | `PREPARED_DIR` | Prepared docs path | `/data/prepared` |
-| `SERVER_PORT` | Server port | `8000` |
 | `CHUNK_MAX_WORDS` | Max words per chunk | `800` |
 | `CHUNK_OVERLAP_WORDS` | Prose overlap words | `80` |
 | `PARENT_LEVEL` | Heading level for parent boundary | `2` |
 | `SNIPPET_MAX_CHARS` | Max chars in search snippet | `500` |
 | `PARENT_CONTENT_MAX_CHARS` | Max chars in parent context | `2000` |
-| `INGEST_BATCH_SIZE` | Batch size for Qdrant upsert | `256` |
 | `SEARCH_FETCH_MULTIPLIER` | Fetch multiplier for dedup | `4` |
 | `SEARCH_FETCH_MIN` | Minimum fetch for dedup | `20` |
+| `CORS_ORIGINS` | CORS allowed origins (comma-separated) | `*` |
 
 ## Key Design Decisions
 
@@ -159,7 +158,7 @@ lore/
 - **DO NOT** run `make ingest` without confirmation — needs server stopped (Qdrant lock)
 - **ALWAYS** run `make prepare` before `make ingest` when source files change
 - **ALWAYS** run `make test` after code changes
-- **ALWAYS** run `uv run ruff check` after Python changes
+- **ALWAYS** run `make ruff` after Python changes (`ruff check --fix`)
 - **ALWAYS** run `make ingest-clear` after chunking logic changes
 
 ## Documentation

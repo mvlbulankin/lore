@@ -45,7 +45,7 @@ MCP uses FastMCP's streamable HTTP transport at `/mcp/`. Session management via 
 |--------|------|-------------|
 | `POST` | `/search` | async. Hybrid search. Body: `{query, framework?, limit}` |
 | `GET` | `/sources` | async. List frameworks and documents |
-| `GET` | `/docs/{framework}/{path:path}` | Get full document. The `:path` converter allows nested paths with slashes. |
+| `GET` | `/docs/{framework}/{path:path}` | sync. Get full document. The `:path` converter allows nested paths with slashes. |
 | `GET` | `/health` | async. Health check |
 
 ## SearchRequest
@@ -93,6 +93,6 @@ Each search result:
   "chunk_index": 9,
   "score": 1.0,
   "snippet": "first 500 chars of content",
-  "parent_content": "first 2000 chars of parent section"
+  "parent_content": "first 2000 chars of parent section, or null if single-chunk section"
 }
 ```
