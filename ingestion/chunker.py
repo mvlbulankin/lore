@@ -19,7 +19,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Sequence
 
+import structlog
 from markdown_it import MarkdownIt
+
+log = structlog.get_logger()
 
 
 @dataclass
@@ -58,11 +61,6 @@ class _ListBlock:
 
 
 @dataclass
-class _TableBlock:
-    rows: list[str]
-
-
-@dataclass
 class _HeadingBlock:
     level: int
     text: str
@@ -72,9 +70,6 @@ class _HeadingBlock:
 class _Section:
     heading_chain: list[str]
     blocks: list[object]
-
-
-_HEADING_CHAIN_MAX = 3
 
 
 def _split_into_sentences(text: str) -> list[str]:
@@ -136,12 +131,17 @@ def _parse_blocks(text: str) -> list[object]:
         if t == "bullet_list_open" or t == "ordered_list_open":
             j = i + 1
             items: list[str] = []
-            current: list[str] = []
-            while j < len(tokens) and tokens[j].type not in (
-                "bullet_list_close",
-                "ordered_list_close",
-            ):
+            current: list[str] | None = []
+            depth = 1
+            while j < len(tokens) and depth > 0:
                 tt = tokens[j]
+                if tt.type in ("bullet_list_open", "ordered_list_open"):
+                    depth += 1
+                elif tt.type in ("bullet_list_close", "ordered_list_close"):
+                    depth -= 1
+                    if depth == 0:
+                        j += 1
+                        break
                 if tt.type == "list_item_open":
                     current = []
                 elif tt.type == "inline" and current is not None:
@@ -151,8 +151,6 @@ def _parse_blocks(text: str) -> list[object]:
                         items.append(" ".join(current).strip())
                     current = None
                 j += 1
-            if j < len(tokens):
-                j += 1
             if items:
                 blocks.append(_ListBlock(items=items))
             i = j
@@ -161,7 +159,9 @@ def _parse_blocks(text: str) -> list[object]:
     return blocks
 
 
-def _build_sections(blocks: list[object]) -> tuple[str, list[_Section]]:
+def _build_sections(
+    blocks: list[object], heading_chain_max: int = 3
+) -> tuple[str, list[_Section]]:
     title = ""
     heading_stack: list[str] = []
     sections: list[_Section] = []
@@ -170,10 +170,12 @@ def _build_sections(blocks: list[object]) -> tuple[str, list[_Section]]:
     def _flush() -> None:
         nonlocal current_blocks
         if current_blocks:
-            sections.append(_Section(
-                heading_chain=list(heading_stack),
-                blocks=list(current_blocks),
-            ))
+            sections.append(
+                _Section(
+                    heading_chain=list(heading_stack),
+                    blocks=list(current_blocks),
+                )
+            )
             current_blocks = []
 
     pending_label: str | None = None
@@ -183,7 +185,7 @@ def _build_sections(blocks: list[object]) -> tuple[str, list[_Section]]:
             if pending_label is not None:
                 current_blocks.append(_ProseBlock(text=f"{'#' * 4} {pending_label}"))
                 pending_label = None
-            if block.level <= _HEADING_CHAIN_MAX:
+            if block.level <= heading_chain_max:
                 _flush()
                 if block.level <= len(heading_stack):
                     heading_stack = heading_stack[: block.level - 1]
@@ -225,8 +227,6 @@ def _blocks_to_text(blocks: Sequence[object]) -> str:
         elif isinstance(block, _ListBlock):
             for item in block.items:
                 parts.append(f"- {item}")
-        elif isinstance(block, _TableBlock):
-            parts.extend(block.rows)
     return "\n\n".join(parts)
 
 
@@ -244,17 +244,39 @@ def _collect_metadata(blocks: Sequence[object]) -> tuple[bool, list[str], list[s
             types.append("prose")
         elif isinstance(block, _ListBlock):
             types.append("list")
-        elif isinstance(block, _TableBlock):
-            types.append("table")
     return has_code, langs, types
 
 
-def _split_prose_for_overlap(prose: _ProseBlock, max_words: int, overlap_words: int) -> list[_ProseBlock]:
+def _split_prose_for_overlap(
+    prose: _ProseBlock, max_words: int, overlap_words: int
+) -> list[_ProseBlock]:
     text = prose.text
     if _count_words(text) <= max_words:
         return [prose]
     sentences = _split_into_sentences(text)
     if len(sentences) <= 1:
+        word_count = _count_words(text)
+        if word_count > max_words:
+            words = text.split()
+            log.warning(
+                "forced_split_long_sentence",
+                words=word_count,
+                max_words=max_words,
+            )
+            forced: list[_ProseBlock] = []
+            overlap_tail: list[str] = []
+            for i in range(0, len(words), max_words):
+                chunk_words = words[i : i + max_words]
+                forced.append(_ProseBlock(text=" ".join(overlap_tail + chunk_words)))
+                if overlap_words and i + max_words < len(words):
+                    overlap_tail = (
+                        chunk_words[-overlap_words:]
+                        if len(chunk_words) >= overlap_words
+                        else chunk_words
+                    )
+                else:
+                    overlap_tail = []
+            return forced
         return [prose]
 
     chunks: list[_ProseBlock] = []
@@ -264,10 +286,18 @@ def _split_prose_for_overlap(prose: _ProseBlock, max_words: int, overlap_words: 
         sent_words = _count_words(sent)
         if current_words + sent_words > max_words and current:
             chunks.append(_ProseBlock(text=" ".join(current)))
-            overlap_text = " ".join(current)[-overlap_words * 6 :] if overlap_words else ""
-            overlap_sentences = _split_into_sentences(overlap_text)
-            current = overlap_sentences
-            current_words = sum(_count_words(s) for s in current)
+            # Walk backwards through complete sentences to build overlap.
+            # This guarantees overlap contains whole sentences only.
+            overlap: list[str] = []
+            overlap_word_count = 0
+            for prev_sent in reversed(current):
+                sw = _count_words(prev_sent)
+                if overlap_word_count + sw > overlap_words:
+                    break
+                overlap.insert(0, prev_sent)
+                overlap_word_count += sw
+            current = overlap
+            current_words = overlap_word_count
         current.append(sent)
         current_words += sent_words
     if current:
@@ -294,7 +324,9 @@ def _split_section(
             if current_blocks:
                 chunks.append((heading_chain, current_blocks))
                 current_blocks = list(overlap_tail)
-                current_words = sum(_count_words(_blocks_to_text([b])) for b in current_blocks)
+                current_words = sum(
+                    _count_words(_blocks_to_text([b])) for b in current_blocks
+                )
                 overlap_tail = []
             block_words = _count_words(block.content)
             current_blocks.append(block)
@@ -313,29 +345,29 @@ def _split_section(
                 if current_words + sub_words > max_words and current_blocks:
                     chunks.append((heading_chain, current_blocks))
                     if overlap_words:
-                        tail_text = _blocks_to_text(current_blocks)
-                        tail_words = tail_text.split()[-overlap_words:]
-                        overlap_text = " ".join(tail_words)
+                        # Walk backwards through prose blocks to build overlap
+                        # from complete sentences.
+                        overlap_blocks: list[_ProseBlock] = []
+                        overlap_wc = 0
+                        for blk in reversed(current_blocks):
+                            if not isinstance(blk, _ProseBlock):
+                                break
+                            for sent in reversed(_split_into_sentences(blk.text)):
+                                sw = _count_words(sent)
+                                if overlap_wc + sw > overlap_words:
+                                    break
+                                overlap_blocks.insert(0, _ProseBlock(text=sent))
+                                overlap_wc += sw
+                        current_blocks = overlap_blocks
+                        current_words = overlap_wc
                     else:
-                        overlap_text = ""
-                    current_blocks = [_ProseBlock(text=overlap_text)] if overlap_text else []
-                    current_words = _count_words(overlap_text) if overlap_text else 0
+                        current_blocks = []
+                        current_words = 0
                 current_blocks.append(sub_block)
                 current_words += sub_words
             continue
 
         if isinstance(block, _ListBlock):
-            text = _blocks_to_text([block])
-            words = _count_words(text)
-            if current_words + words > max_words and current_blocks:
-                chunks.append((heading_chain, current_blocks))
-                current_blocks = []
-                current_words = 0
-            current_blocks.append(block)
-            current_words += words
-            continue
-
-        if isinstance(block, _TableBlock):
             text = _blocks_to_text([block])
             words = _count_words(text)
             if current_words + words > max_words and current_blocks:
@@ -359,12 +391,13 @@ def make_chunks(
     max_words: int = 800,
     overlap_words: int = 80,
     parent_level: int = 2,
+    heading_chain_max: int = 3,
 ) -> list[Chunk]:
     blocks = _parse_blocks(raw_text)
     if not blocks:
         return []
 
-    title, sections = _build_sections(blocks)
+    title, sections = _build_sections(blocks, heading_chain_max=heading_chain_max)
     if not title:
         title = path.replace("/", "_").replace(".md", "")
 
@@ -384,18 +417,20 @@ def make_chunks(
         else:
             content = body
         has_code, langs, types = _collect_metadata(blocks_in_chunk)
-        chunks.append(Chunk(
-            framework=framework,
-            source_path=path,
-            title=title,
-            heading=heading_str,
-            chunk_index=idx,
-            content=content,
-            is_last_chunk=False,
-            has_code=has_code,
-            code_languages=langs,
-            block_types=types,
-        ))
+        chunks.append(
+            Chunk(
+                framework=framework,
+                source_path=path,
+                title=title,
+                heading=heading_str,
+                chunk_index=idx,
+                content=content,
+                is_last_chunk=False,
+                has_code=has_code,
+                code_languages=langs,
+                block_types=types,
+            )
+        )
 
     if chunks:
         last = chunks[-1]

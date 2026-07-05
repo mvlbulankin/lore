@@ -4,7 +4,7 @@ Local RAG documentation server with MCP interface for AI agents.
 
 ## Architecture
 
-One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP. Hybrid retrieval: dense vectors + TF-IDF sparse vectors + RRF fusion (server-side).
+One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP + fastembed-gpu (ONNX, GPU via CUDAExecutionProvider). Hybrid retrieval: dense vectors + TF-IDF sparse vectors + RRF fusion (server-side). Self-contained — no external dependencies.
 
 ```
 data/source/ → preparers/ → data/prepared/ → ingestion/ → Qdrant (dense + sparse)
@@ -15,7 +15,7 @@ data/source/ → preparers/ → data/prepared/ → ingestion/ → Qdrant (dense 
 ```
 lore/
 ├── docker-compose.yml          # single service, port 8000
-├── Dockerfile                  # python:3.14-slim + uv, runs as root
+├── Dockerfile                  # python:3.14-slim + uv, runs as lore user
 ├── .env.example                # template for .env
 ├── .python-version             # 3.14
 ├── Makefile                    # all commands
@@ -31,8 +31,11 @@ lore/
 │   └── qdrant_storage/         # Qdrant embedded storage + sparse model
 ├── docs_shared/                # shared package (workspace member)
 │   ├── config.py               # Settings from env vars
-│   ├── retriever.py            # QdrantRetriever, dense + sparse + RRF
-│   └── guards.py               # embedding drift detection
+│   ├── exceptions.py           # Custom exception hierarchy
+│   ├── logging.py              # Shared structlog configuration
+│   ├── embedder.py             # fastembed-gpu embedder (CUDA required)
+│   ├── retriever.py            # QdrantRetriever, async, dense + sparse + RRF
+│   └── sparse_builder.py       # TF-IDF → Qdrant sparse vectors
 ├── preparers/                  # host-side document preparation
 │   ├── base.py                 # FrameworkPreparer Protocol
 │   ├── registry.py             # auto-discovery
@@ -43,17 +46,17 @@ lore/
 │   └── test/prepare.py         # trivial copy
 ├── ingestion/                  # runs inside Docker container
 │   ├── chunker.py              # code-aware markdown chunker (parent-child)
-│   ├── embedder.py             # batch embedding via LM Studio
-│   ├── sparse_builder.py       # TF-IDF → Qdrant sparse vectors
 │   └── ingest.py               # main ingest workflow
 ├── app/
 │   └── server.py               # FastAPI + FastMCP server
 ├── tests/
 │   ├── conftest.py
-│   ├── test_chunker.py         # 31 tests
-│   ├── test_preparer_base.py   # 16 tests
+│   ├── test_chunker.py         # 35 tests
+│   ├── test_config.py          # 4 tests
+│   ├── test_embedder_local.py  # 12 tests
+│   ├── test_preparer_base.py   # 12 tests
 │   ├── test_sparse_builder.py  # 6 tests
-│   └── test_retriever.py       # 5 tests
+│   └── test_retriever.py       # 8 tests
 ├── docs/
 │   ├── areas/                  # per-component documentation
 │   │   ├── retriever.md
@@ -94,25 +97,28 @@ lore/
 ## Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
-| `LM_STUDIO_URL` | LM Studio API URL | `http://host.docker.internal:1234/v1` |
-| `LM_STUDIO_API_KEY` | LM Studio Bearer token | (empty) |
-| `EMBEDDING_MODEL` | Embedding model name | `nomic-embed-text-v1.5` |
-| `EMBEDDING_DIM` | Embedding vector dimension | `768` |
+|---------|-------------|---------|
+| `EMBEDDING_MODEL` | Embedding model name | `BAAI/bge-small-en-v1.5` |
+| `EMBEDDING_DIM` | Embedding vector dimension | `384` |
+| `EMBEDDING_PROVIDERS` | ONNX execution providers | `CUDAExecutionProvider` |
 | `QDRANT_STORAGE_PATH` | Qdrant embedded storage path | `/data/qdrant_storage` |
 | `QDRANT_COLLECTION` | Qdrant collection name | `docs` |
-| `RRF_K` | RRF fusion parameter | `60` |
 | `PREPARED_DIR` | Prepared docs path | `/data/prepared` |
 | `SERVER_PORT` | Server port | `8000` |
 | `CHUNK_MAX_WORDS` | Max words per chunk | `800` |
 | `CHUNK_OVERLAP_WORDS` | Prose overlap words | `80` |
 | `PARENT_LEVEL` | Heading level for parent boundary | `2` |
+| `SNIPPET_MAX_CHARS` | Max chars in search snippet | `500` |
+| `PARENT_CONTENT_MAX_CHARS` | Max chars in parent context | `2000` |
+| `INGEST_BATCH_SIZE` | Batch size for Qdrant upsert | `256` |
+| `SEARCH_FETCH_MULTIPLIER` | Fetch multiplier for dedup | `4` |
+| `SEARCH_FETCH_MIN` | Minimum fetch for dedup | `20` |
 
 ## Key Design Decisions
 
 1. **One container** — no inter-service networking, simpler operations
 2. **Qdrant embedded** — in-process, no separate DB container, dense + sparse + RRF in one
-3. **External embeddings** — LM Studio handles GPU, container stays lightweight
+3. **In-process embeddings** — fastembed-gpu (ONNX, GPU via CUDAExecutionProvider), hard-fail if absent
 4. **TF-IDF sparse vectors** — BM25-like keyword search via scikit-learn, native in Qdrant
 5. **Parent-child chunking** — small chunks for precision, parent content for context
 6. **Atomic preparer publish** — staging + rename, ingest always sees consistent snapshot
@@ -124,7 +130,7 @@ lore/
 |--------|------|-------------|
 | `POST` | `/search` | Hybrid search. Body: `{query, framework?, limit}`. Returns `snippet` + `parent_content`. |
 | `GET` | `/sources` | List frameworks and documents |
-| `GET` | `/docs/{framework}/{path}` | Get full document |
+| `GET` | `/docs/{framework}/{path:path}` | Get full document |
 | `GET` | `/health` | Health check |
 
 ## MCP Tools
@@ -135,10 +141,16 @@ lore/
 | `get_document` | `framework`, `path` | Read full document |
 | `list_sources` | — | List indexed frameworks |
 
+## Security
+
+1. **Pickle** is used only for self-generated cache (`_chunks_cache/`). Cache is regenerated every ingest run from trusted chunking output — never from untrusted input.
+2. **Path traversal** is blocked in `get_document`. Paths are resolved and checked to be within the prepared directory.
+3. **CORS** defaults to `*` (permissive). Restrict via env in production.
+
 ## Rules for Agents
 
 - **DO NOT** modify `data/source/` — it is read-only raw documentation
-- **DO NOT** run `make ingest` without confirmation — it requires LM Studio running
+- **DO NOT** run `make ingest` without confirmation — first startup downloads ONNX model
 - **ALWAYS** run `make prepare` before `make ingest` when source files change
 - **ALWAYS** run `make test` after code changes
 - **ALWAYS** run `uv run ruff check` after Python changes

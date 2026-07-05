@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from .config import settings
-from .retriever import QdrantRetriever, Hit, http_client
-from .guards import warn_if_embedding_drift
+from .embedder import Embedder, EMBEDDING_MODEL
+from .exceptions import ConfigError, DocumentNotFoundError, LoreError, QdrantError
+from .retriever import QdrantRetriever, Hit
+from .sparse_builder import SparseBuilder
 
 __all__ = [
     "settings",
+    "Embedder",
+    "EMBEDDING_MODEL",
     "QdrantRetriever",
     "Hit",
-    "http_client",
-    "warn_if_embedding_drift",
+    "SparseBuilder",
+    "LoreError",
+    "QdrantError",
+    "ConfigError",
+    "DocumentNotFoundError",
 ]

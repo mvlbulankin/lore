@@ -10,8 +10,8 @@ uv run pytest tests/test_preparer_base.py -v  # только preparer contract
 
 | Файл | Тестов | Что проверяет |
 |---|---|---|
-| `test_chunker.py` | 25 | Heading chain, H4-labels, code-блоки атомарны, overlap только для prose, `is_last_chunk`, метаданные |
-| `test_preparer_base.py` | 8 | `FrameworkPreparer` Protocol, атомарный rename через staging, dry-run без записи, registry discovers per-framework preparers |
+| `test_chunker.py` | 35 | Heading chain, H4-labels, code-блоки атомарны, overlap только для prose, parent-child, `is_last_chunk`, метаданные |
+| `test_preparer_base.py` | 12 | `FrameworkPreparer` Protocol, атомарный rename через staging, dry-run без записи, registry discovers per-framework preparers, Spark cleanup helpers |
 
 ## Требования
 

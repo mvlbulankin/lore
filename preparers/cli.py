@@ -52,10 +52,7 @@ def main() -> None:
         print(f"[ERROR] No preparers found under source root: {args.source_root}")
         return
 
-    selected = [
-        p for p in preparers
-        if not args.framework or p.name == args.framework
-    ]
+    selected = [p for p in preparers if not args.framework or p.name == args.framework]
     if args.framework and not selected:
         print(f"[ERROR] Framework '{args.framework}' not registered.")
         return
@@ -63,7 +60,9 @@ def main() -> None:
     for preparer in selected:
         if args.no_download and hasattr(preparer, "download_pyspark"):
             preparer.download_pyspark = False
-        print(f"\n[{preparer.name}] source={preparer.source_dir} prepared={preparer.prepared_dir}")
+        print(
+            f"\n[{preparer.name}] source={preparer.source_dir} prepared={preparer.prepared_dir}"
+        )
         preparer.run(execute=args.execute)
 
 

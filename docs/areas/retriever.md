@@ -1,22 +1,33 @@
 # Retriever
 
-**File:** `docs_shared/retriever.py`
+**Files:** `docs_shared/retriever.py`, `docs_shared/sparse_builder.py`, `docs_shared/embedder.py`
 
 ## Overview
 
-`QdrantRetriever` orchestrates hybrid search using Qdrant's prefetch + FusionQuery for server-side RRF, with parent-child deduplication.
+`QdrantRetriever` orchestrates async hybrid search using Qdrant's prefetch + FusionQuery for server-side RRF, with parent-child deduplication.
 
 ## Initialization
 
 ```python
-retriever = QdrantRetriever()
+from docs_shared.embedder import Embedder
+from docs_shared.retriever import QdrantRetriever
+
+embedder = Embedder(cache_dir="/data/fastembed_cache")
+retriever = QdrantRetriever(embedder=embedder)
 ```
 
-Creates a `QdrantClient(path=...)` (embedded mode), and loads the sparse TF-IDF model from disk.
+Creates an `AsyncQdrantClient(path=...)` (embedded mode) and loads the sparse TF-IDF model from disk. The embedder is passed in (in-process ONNX, no HTTP calls).
+
+## Async Methods
+
+`search()`, `list_sources()`, `collection_count()` are async. Use `await`.
+`get_document()` and `verify_embedding_model()` remain sync (filesystem operations).
+
+Close resources on shutdown: `await retriever.aclose()`
 
 ## Hybrid Search (`search`)
 
-1. **Dense query vector** — embed via LM Studio POST to `{LM_STUDIO_URL}/embeddings`
+1. **Dense query vector** — embed via in-process fastembed (`self._embedder.embed_one(query)`)
 2. **Sparse query vector** — encode via `SparseBuilder.encode_query()` (TF-IDF)
 3. **Framework filter** — `Filter(must=[FieldCondition(key="framework", match=MatchValue(value=...))])`
 4. **Prefetch** — two sub-queries:
@@ -36,21 +47,27 @@ Dedup keeps the highest-scoring child per `parent_id`, returning:
 
 Single-chunk sections have `parent_content = ""` in payload, which falls back to `content`.
 
-## Embedding (`_embed`)
-
-- Uses shared `http_client` (httpx with 3 retries, 60s timeout).
-- Sends batch to LM Studio OpenAI-compatible `/embeddings` endpoint.
-- Returns list of embedding vectors.
-
 ## Methods
 
 | Method | Description |
 |--------|-------------|
-| `search(query, framework?, limit=5)` | Hybrid search: dense + sparse → prefetch + Fusion.RRF → parent dedup → top limit |
+| `search(query, framework?, limit=5)` | async. Hybrid search: dense + sparse -> prefetch + Fusion.RRF -> parent dedup -> top limit |
 | `get_document(framework, path)` | Read `.md` from `prepared_dir/framework/path` |
-| `list_sources()` | Return `{framework: [source_paths]}` via Qdrant scroll |
-| `collection_count()` | Return number of points in Qdrant collection |
-| `verify_embedding_model()` | No-op (Qdrant doesn't store custom collection metadata) |
+| `list_sources()` | async. Return `{framework: [source_paths]}` via Qdrant scroll |
+| `collection_count()` | async. Return number of points in Qdrant collection |
+| `verify_embedding_model()` | Read `.model_info.json` sidecar, compare with current settings. Returns `True` if consistent. |
+| `aclose()` | async. Close AsyncQdrantClient |
+
+## Error Handling
+
+The retriever raises custom exceptions:
+
+| Exception | When |
+|-----------|------|
+| `QdrantError` | Qdrant operation fails (in `collection_count`, `list_sources`) |
+| `DocumentNotFoundError` | File not found in prepared directory (in `get_document`) |
+
+All exceptions inherit from `LoreError`.
 
 ## Hit Dataclass
 

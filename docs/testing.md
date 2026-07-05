@@ -14,10 +14,10 @@ uv run pytest -k "parent" -v                  # keyword filter
 
 | File | Tests | Coverage |
 |------|-------|----------|
-| `test_chunker.py` | 31 | Heading chain, H4-labels, code atomicity, prose overlap, `is_last_chunk`, metadata, block parsing, **parent-child chunking** |
-| `test_preparer_base.py` | 16 | Protocol conformance, atomic rename, dry-run, registry discovery, spark preparer helpers |
+| `test_chunker.py` | 35 | Heading chain, H4-labels, code atomicity, prose overlap, `is_last_chunk`, metadata, block parsing, **parent-child chunking** |
+| `test_preparer_base.py` | 12 | Protocol conformance, atomic rename, dry-run, registry discovery, spark preparer helpers |
 | `test_sparse_builder.py` | 6 | TF-IDF fit/build, encode_query, save/load, error handling |
-| `test_retriever.py` | 5 | Qdrant collection, framework filter, prefetch + Fusion.RRF, sparse model, parent dedup |
+| `test_retriever.py` | 8 | Qdrant collection, framework filter, prefetch + Fusion.RRF, sparse model, parent dedup, path traversal |
 
 ## Test Categories
 

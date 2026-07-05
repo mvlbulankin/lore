@@ -4,18 +4,20 @@
 
 ## Architecture
 
-Single FastAPI application that mounts FastMCP at `/mcp`. Both MCP tools and REST endpoints share the same `HybridRetriever` instance.
+Single FastAPI application that mounts FastMCP at `/mcp`. Both MCP tools and REST endpoints share the same `QdrantRetriever` instance. Search endpoints are async.
 
 ## Lifespan
 
 ```python
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
+    if not retriever.verify_embedding_model():
+        log.error("embedding_model_drift_detected", hint="run: make ingest-clear")
     yield
-    shared_http_client.close()
+    await retriever.aclose()
 ```
 
-Uses `combine_lifespans(app_lifespan, mcp_app.lifespan)` to manage both FastAPI and FastMCP lifecycles. On shutdown, closes the shared httpx client.
+Uses `combine_lifespans(app_lifespan, mcp_app.lifespan)` to manage both FastAPI and FastMCP lifecycles. On startup, verifies embedding model consistency. On shutdown, closes async retriever.
 
 ## Structlog
 
@@ -25,18 +27,18 @@ JSON-formatted logs with ISO timestamps, log levels, and exception info. Minimum
 
 | Tool | Parameters | Description |
 |------|-----------|-------------|
-| `search_docs` | `query`, `framework?`, `limit=5` | Hybrid BM25+Vector search with RRF fusion |
+| `search_docs` | `query`, `framework?`, `limit=5` | async. Hybrid dense+sparse search with RRF fusion |
 | `get_document` | `framework`, `path` | Read full `.md` from prepared directory |
-| `list_sources` | — | List all indexed frameworks and their source paths |
+| `list_sources` | — | async. List all indexed frameworks and their source paths |
 
 ## REST Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/search` | Hybrid search. Body: `{query, framework?, limit}` |
-| `GET` | `/sources` | List frameworks and documents |
+| `POST` | `/search` | async. Hybrid search. Body: `{query, framework?, limit}` |
+| `GET` | `/sources` | async. List frameworks and documents |
 | `GET` | `/docs/{framework}/{path:path}` | Get full document. The `:path` converter allows nested paths with slashes. |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` | async. Health check |
 
 ## SearchRequest
 
@@ -51,26 +53,38 @@ class SearchRequest(BaseModel):
 
 ```json
 {
-  "chroma": true,
-  "lm_studio": true,
-  "bm25_loaded": true,
+  "qdrant": true,
+  "sparse_model": true,
   "collection_count": 1234,
-  "embedding_model": "nomic-embed-text-v1.5"
+  "embedding_model": "nomic-ai/nomic-embed-text-v1.5"
 }
 ```
+
+`/health` never returns 500 — all checks are wrapped in try/except with logging.
+
+## Error Responses
+
+| Endpoint | Exception | Status |
+|----------|-----------|--------|
+| `/search` | `QdrantError` | 500 |
+| `/sources` | `QdrantError` | 500 |
+| `/docs/...` | `DocumentNotFoundError` | 404 |
+
+MCP tools raise `RuntimeError` with descriptive message on failure.
 
 ## Hit Response Format
 
 Each search result:
 ```json
 {
-  "id": "spark/docs/sql.md/3",
+  "id": "3",
   "framework": "spark",
   "path": "docs/sql.md",
   "title": "Spark SQL",
   "heading": "Spark SQL > DataFrame API",
   "chunk_index": 3,
   "score": 0.42,
-  "snippet": "first 500 chars of content"
+  "snippet": "first 500 chars of content",
+  "parent_content": "first 2000 chars of parent section"
 }
 ```

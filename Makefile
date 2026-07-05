@@ -40,7 +40,7 @@ logs:
 	docker compose logs -f lore
 
 test:
-	uv run pytest
+	uv run pytest --cov=app --cov=docs_shared --cov=ingestion --cov=preparers --cov-report=term-missing
 
 clean:
 	docker compose down -v

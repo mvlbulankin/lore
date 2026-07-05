@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import pickle
 from pathlib import Path
 
+import joblib
+from scipy.sparse import spmatrix
 from qdrant_client.models import SparseVector
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -51,26 +52,26 @@ class SparseBuilder:
         return SparseVector(indices=row.indices.tolist(), values=row.data.tolist())
 
     def save(self, path: str | Path) -> None:
-        """Persist fitted vectorizer to disk."""
-        with open(path, "wb") as f:
-            pickle.dump(self._vectorizer, f)
+        """Persist fitted vectorizer to disk via joblib."""
+        joblib.dump(self._vectorizer, path)
 
     @classmethod
     def load(cls, path: str | Path) -> "SparseBuilder":
-        """Load fitted vectorizer from disk."""
+        """Load fitted vectorizer from disk via joblib."""
         instance = cls.__new__(cls)
-        with open(path, "rb") as f:
-            instance._vectorizer = pickle.load(f)
+        instance._vectorizer = joblib.load(path)
         instance._fitted = True
         return instance
 
-    def _matrix_to_sparse(self, matrix) -> list[SparseVector]:
+    def _matrix_to_sparse(self, matrix: spmatrix) -> list[SparseVector]:
         vectors: list[SparseVector] = []
         for row in matrix:
-            vectors.append(SparseVector(
-                indices=row.indices.tolist(),
-                values=row.data.tolist(),
-            ))
+            vectors.append(
+                SparseVector(
+                    indices=row.indices.tolist(),
+                    values=row.data.tolist(),
+                )
+            )
         return vectors
 
 

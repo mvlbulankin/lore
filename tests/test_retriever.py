@@ -5,6 +5,8 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -19,7 +21,10 @@ from qdrant_client.models import (
     SparseVectorParams,
     VectorParams,
 )
-from ingestion.sparse_builder import SparseBuilder
+from docs_shared.config import settings
+from docs_shared.exceptions import DocumentNotFoundError
+from docs_shared.retriever import QdrantRetriever
+from docs_shared.sparse_builder import SparseBuilder
 
 
 def _create_test_collection(
@@ -194,3 +199,53 @@ def test_parent_dedup_logic():
     assert best_per_parent["parent-1"][1].payload["content"] == "child A"
     # parent-2 -> child C (score 0.9 > 0.5)
     assert best_per_parent["parent-2"][1].payload["content"] == "child C"
+
+
+# ---------------------------------------------------------------------------
+# Path traversal security
+# ---------------------------------------------------------------------------
+
+
+def _make_retriever(tmp_path: Path) -> QdrantRetriever:
+    """Create retriever with temp paths for testing get_document."""
+    settings.prepared_dir = str(tmp_path / "prepared")
+    settings.qdrant_storage_path = str(tmp_path / "qdrant")
+    (tmp_path / "prepared").mkdir(exist_ok=True)
+    (tmp_path / "qdrant").mkdir(exist_ok=True)
+    from docs_shared.embedder import Embedder
+
+    return QdrantRetriever(embedder=Embedder())
+
+
+def test_get_document_blocks_path_traversal(tmp_path):
+    """Path traversal (../etc/passwd) raises DocumentNotFoundError."""
+    (tmp_path / "prepared" / "spark").mkdir(parents=True)
+    (tmp_path / "prepared" / "spark" / "doc.md").write_text("safe")
+
+    r = _make_retriever(tmp_path)
+    with pytest.raises(DocumentNotFoundError):
+        r.get_document("spark", "../etc/passwd")
+    with pytest.raises(DocumentNotFoundError):
+        r.get_document("spark", "doc.md/../../../etc/passwd")
+
+
+def test_get_document_blocks_absolute_path(tmp_path):
+    """Absolute path resolves within prepared dir and is blocked."""
+    (tmp_path / "prepared" / "spark").mkdir(parents=True)
+    (tmp_path / "prepared" / "spark" / "doc.md").write_text("safe")
+
+    r = _make_retriever(tmp_path)
+    with pytest.raises(DocumentNotFoundError):
+        r.get_document("spark", "/etc/passwd")
+
+
+def test_get_document_returns_real_file(tmp_path):
+    """Happy path: valid framework + path returns file content."""
+    spark_dir = tmp_path / "prepared" / "spark"
+    spark_dir.mkdir(parents=True)
+    (spark_dir / "doc.md").write_text("# Hello\n\nWorld.")
+
+    r = _make_retriever(tmp_path)
+    content = r.get_document("spark", "doc.md")
+    assert "# Hello" in content
+    assert "World" in content

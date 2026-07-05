@@ -5,7 +5,7 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
-from ingestion.sparse_builder import SparseBuilder
+from docs_shared.sparse_builder import SparseBuilder
 
 
 def test_fit_build_returns_sparse_vectors():

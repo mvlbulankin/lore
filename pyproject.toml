@@ -13,11 +13,12 @@ dependencies = [
     "markdownify>=0.13.0",
     "qdrant-client>=1.12.0",
     "scikit-learn>=1.5.0",
+    "fastembed-gpu>=0.8.0",
     "docs-shared",
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.5.0"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.5.0"]
 
 [tool.uv.workspace]
 members = ["docs_shared"]
@@ -28,5 +29,16 @@ docs-shared = { workspace = true }
 [tool.ruff]
 exclude = ["data/source"]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 [tool.hatch.build.targets.wheel]
 packages = ["."]
+
+[tool.coverage.run]
+branch = true
+source = ["app", "docs_shared", "ingestion", "preparers"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 55

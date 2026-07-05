@@ -230,6 +230,45 @@ text B
     assert chunks[1].content.startswith("T > B")
 
 
+def test_overlap_only_from_chunk_tail():
+    """Overlap words must come from the end of the previous chunk, not its middle."""
+    sentences = [
+        f"Sentence group {i} with enough words to fill the overlap buffer properly and more."
+        for i in range(50)
+    ]
+    prose = " ".join(sentences)
+    md = f"# Doc\n\n## Section\n\n{prose}\n"
+    chunks = make_chunks("fw", "a.md", md, max_words=80, overlap_words=20)
+    assert len(chunks) >= 2
+    heading_words = set(chunks[0].heading.split())
+    chunk0_body = [w for w in chunks[0].content.split() if w not in heading_words]
+    chunk1_body = [w for w in chunks[1].content.split() if w not in heading_words]
+    chunk0_body_set = set(chunk0_body)
+    chunk1_body_set = set(chunk1_body)
+    overlap_body = chunk0_body_set & chunk1_body_set
+    chunk0_tail = set(chunk0_body[-25:])
+    for ow in overlap_body:
+        assert ow in chunk0_tail, (
+            f"Overlap word '{ow}' is from middle of chunk, not tail"
+        )
+
+
+def test_long_sentence_forced_split():
+    """A single sentence exceeding max_words should be split by word boundaries."""
+    long_sentence = " ".join(f"word{i}" for i in range(200))
+    md = f"# Doc\n\n## Section\n\n{long_sentence}\n"
+    chunks = make_chunks("fw", "a.md", md, max_words=50, overlap_words=5)
+    assert len(chunks) >= 2
+    for c in chunks:
+        body_words = c.content.split()
+        heading_words = set(c.heading.split()) if c.heading else set()
+        body_only = [w for w in body_words if w not in heading_words]
+        # Account for overlap words (+5)
+        assert len(body_only) <= 55, (
+            f"Chunk body exceeds max_words+overlap: {len(body_only)}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Metadata and structure
 # ---------------------------------------------------------------------------
@@ -446,9 +485,47 @@ def test_parent_content_concatenation():
             assert c.parent_content == first_parent
 
 
+def test_overlap_larger_than_last_sentence():
+    """When overlap_words > words in last sentence, overlap should still carry content.
+
+    Regression: _split_prose_for_overlap splits overlap text by sentences,
+    which could yield zero sentences if overlap is shorter than one sentence.
+    """
+    # Short sentences, large overlap
+    md = "# Title\n\n" + " ".join(f"Word {i}." for i in range(200)) + "\n"
+    chunks = make_chunks("fw", "a.md", md, max_words=50, overlap_words=40)
+    assert len(chunks) >= 2
+    # Overlap should carry content between chunks
+    for i in range(1, len(chunks)):
+        prev_words = set(chunks[i - 1].content.split())
+        curr_words = set(chunks[i].content.split())
+        shared = prev_words & curr_words
+        # At least some overlap words (excluding heading words)
+        assert len(shared) > 0, f"No overlap between chunk {i - 1} and {i}"
+
+
 def test_different_sections_different_parents():
     md = "# Doc\n\n## A\n\ntext A\n\n## B\n\ntext B\n"
     chunks = make_chunks("fw", "a.md", md)
     assert chunks[0].parent_id == "fw/a.md/Doc > A"
     assert chunks[1].parent_id == "fw/a.md/Doc > B"
     assert chunks[0].parent_id != chunks[1].parent_id
+
+
+# ---------------------------------------------------------------------------
+# Heading chain max parameter
+# ---------------------------------------------------------------------------
+
+
+def test_heading_chain_max_parameter():
+    """heading_chain_max controls how many heading levels are included."""
+    md = "# H1\n\n## H2\n\n### H3\n\n#### H4\n\ntext\n"
+    # Default (3): H1 > H2 > H3
+    chunks_default = make_chunks("fw", "a.md", md)
+    assert chunks_default[0].heading == "H1 > H2 > H3"
+    # heading_chain_max=2: H1 > H2
+    chunks_2 = make_chunks("fw", "a.md", md, heading_chain_max=2)
+    assert chunks_2[0].heading == "H1 > H2"
+    # heading_chain_max=1: H1 only
+    chunks_1 = make_chunks("fw", "a.md", md, heading_chain_max=1)
+    assert chunks_1[0].heading == "H1"

@@ -5,24 +5,25 @@
 
 Локальный RAG-сервер документации с MCP-интерфейсом для агентов.
 
-Один Docker-контейнер: ChromaDB (PersistentClient, in-process) + FastAPI (REST) + FastMCP.
+Один Docker-контейнер: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP + fastembed-gpu (ONNX).
 
 ## Архитектура
 
 | Слой | Решение |
 |------|---------|
-| Vector DB | ChromaDB `PersistentClient` (in-process) |
-| Embedding | `nomic-embed-text-v1.5` (768 dims) через LM Studio |
-| Retrieval | Hybrid: BM25 + Vector + RRF (k=60) |
+| Vector DB | Qdrant embedded `AsyncQdrantClient` (in-process) |
+| Embedding | `BAAI/bge-small-en-v1.5` (384 dims) через fastembed-gpu (ONNX, CUDA) |
+| Retrieval | Hybrid: TF-IDF sparse + dense embeddings + RRF (server-side via Qdrant prefetch + FusionQuery) |
 | Chunking | Code-aware: H1>H2>H3 chain, atomic code-fence, prose с overlap |
-| Container | Один образ ~360MB (python:3.14-slim + uv) |
-| Pipeline | `data/source/` → `preparers/` → `data/prepared/` → `ingestion/` → ChromaDB |
+| Container | Один образ ~400MB (python:3.14-slim + uv) |
+| Pipeline | `data/source/` → `preparers/` → `data/prepared/` → `ingestion/` → Qdrant |
 
 ## Требования
 
 - **Docker** — для контейнера lore
 - **uv** — менеджер пакетов Python
-- **LM Studio** — запущен локально с моделью `nomic-embed-text-v1.5`
+- **nvidia-container-toolkit** — для GPU-ускорения ONNX
+- **NVIDIA GPU + драйвер** — CUDA 12/13 совместимый
 - **Python 3.14**
 
 ## Quick Start
@@ -30,7 +31,6 @@
 ```bash
 # 1. Настроить .env
 cp .env.example .env
-# Заполнить LM_STUDIO_API_KEY
 
 # 2. Подготовить документы
 make prepare
@@ -44,10 +44,7 @@ curl http://localhost:8000/health
 # 5. Проиндексировать
 make ingest
 
-# 6. Перезапустить контейнер (BM25 загружается при старте)
-make down && make up
-
-# 7. Поиск
+# 6. Поиск
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"query": "your query", "framework": "spark", "limit": 5}'
@@ -71,7 +68,7 @@ curl -X POST http://localhost:8000/search \
 
 | Файл | Описание |
 |------|----------|
-| [docs/areas/retriever.md](docs/areas/retriever.md) | HybridRetriever, BM25, ChromaDB, RRF |
+| [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, TF-IDF sparse, Qdrant, RRF |
 | [docs/areas/chunker.md](docs/areas/chunker.md) | Code-aware chunking |
 | [docs/areas/preparers.md](docs/areas/preparers.md) | FrameworkPreparer, pipeline |
 | [docs/areas/ingestion.md](docs/areas/ingestion.md) | Ingest workflow, embedder |

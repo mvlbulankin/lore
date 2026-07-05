@@ -40,7 +40,11 @@ class _FakePreparer:
         staging = self.prepared_dir.parent / f"_prepared_{self.name}_staging"
 
         def _build() -> list[PreparedDoc]:
-            return [self.transform(p) for p in self.discover() if self.transform(p) is not None]
+            return [
+                self.transform(p)
+                for p in self.discover()
+                if self.transform(p) is not None
+            ]
 
         _atomic_publish(self.prepared_dir, staging, _build)
 
@@ -120,7 +124,9 @@ def test_re_execute_replaces_previous(fake_source: Path) -> None:
     first = (prepared_root / "fake" / "doc1.md").read_text(encoding="utf-8")
     assert first == "# Doc 1\n\nHello world.\n"
 
-    (source_root / "fake" / "doc1.md").write_text("# Doc 1\n\nUpdated.\n", encoding="utf-8")
+    (source_root / "fake" / "doc1.md").write_text(
+        "# Doc 1\n\nUpdated.\n", encoding="utf-8"
+    )
     preparer.run(execute=True)
     second = (prepared_root / "fake" / "doc1.md").read_text(encoding="utf-8")
     assert "Updated" in second
@@ -159,17 +165,45 @@ def test_registry_filters_by_framework(tmp_path: Path) -> None:
 
 def test_spark_redirect_filter() -> None:
     from preparers.spark.prepare import _is_useless_stub
-    assert _is_useless_stub("# Redirect\n\nThis document has moved [here](foo.html).\n") is True
-    assert _is_useless_stub('# "Migration Guide"\n\nThis page has moved [here](./streaming/ss-migration-guide.html).\n') is True
-    assert _is_useless_stub("# Real Doc\n\nThis is actual content with meaningful text.\n") is False
-    assert _is_useless_stub("# Spark SQL\n\nThis page gives an overview of all public Spark SQL API.\n") is True
-    assert _is_useless_stub("# Subqueries\n\n**This page is under construction**\n") is True
-    assert _is_useless_stub("# PySpark\n\nThe migration guide is now archived on [this page](foo).\n") is True
-    assert _is_useless_stub("# Debug\n\nSee also the other docs for more info.\n") is False
+
+    assert (
+        _is_useless_stub("# Redirect\n\nThis document has moved [here](foo.html).\n")
+        is True
+    )
+    assert (
+        _is_useless_stub(
+            '# "Migration Guide"\n\nThis page has moved [here](./streaming/ss-migration-guide.html).\n'
+        )
+        is True
+    )
+    assert (
+        _is_useless_stub("# Real Doc\n\nThis is actual content with meaningful text.\n")
+        is False
+    )
+    assert (
+        _is_useless_stub(
+            "# Spark SQL\n\nThis page gives an overview of all public Spark SQL API.\n"
+        )
+        is True
+    )
+    assert (
+        _is_useless_stub("# Subqueries\n\n**This page is under construction**\n")
+        is True
+    )
+    assert (
+        _is_useless_stub(
+            "# PySpark\n\nThe migration guide is now archived on [this page](foo).\n"
+        )
+        is True
+    )
+    assert (
+        _is_useless_stub("# Debug\n\nSee also the other docs for more info.\n") is False
+    )
 
 
 def test_spark_notebook_cell_marker_cleanup() -> None:
     from preparers.spark.prepare import _clean_notebook_md
+
     text = "```python\n[1]:\n```\n\nSome text\n"
     result = _clean_notebook_md(text)
     assert "[1]:" not in result
@@ -179,6 +213,7 @@ def test_spark_notebook_cell_marker_cleanup() -> None:
 
 def test_spark_empty_fence_cleanup() -> None:
     from preparers.spark.prepare import _clean_notebook_md
+
     text = "```python\n```\n\nSome text\n"
     result = _clean_notebook_md(text)
     assert "```python" not in result
@@ -187,6 +222,7 @@ def test_spark_empty_fence_cleanup() -> None:
 
 def test_spark_language_default_python() -> None:
     from preparers.spark.prepare import _clean_notebook_md
+
     text = "```\nprint('hello')\n```\n"
     result = _clean_notebook_md(text)
     assert "```python" in result

@@ -22,13 +22,10 @@ def _atomic_publish(
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(doc.content, encoding="utf-8")
 
-    backup = prepared_dir.parent / f"_backup_{prepared_dir.name}"
-    if backup.exists():
-        shutil.rmtree(backup)
+    # Atomic swap: remove old prepared dir, then rename staging in its place.
+    # Staging is always a fresh build, so a crash between removal and rename
+    # is safe — the next run rebuilds staging from scratch.
     if prepared_dir.exists():
-        prepared_dir.rename(backup)
+        shutil.rmtree(prepared_dir)
     staging_dir.rename(prepared_dir)
-
-    if backup.exists():
-        shutil.rmtree(backup)
     return len(docs)

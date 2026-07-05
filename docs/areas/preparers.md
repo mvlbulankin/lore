@@ -78,4 +78,4 @@ python -m preparers.cli --no-download             # skip network downloads
 3. **Register the package** — add `preparers.{name}` to `_PREPARER_PACKAGES` in `preparers/registry.py`
 4. **Place source files** — put raw documentation in `data/source/{name}/`
 5. **Prepare and verify** — run `make prepare`, inspect `data/prepared/{name}/` for correct output
-6. **Ingest** — run `make ingest` to index the new framework into ChromaDB and BM25
+6. **Ingest** — run `make ingest` to index the new framework into Qdrant (dense + sparse)

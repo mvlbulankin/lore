@@ -31,7 +31,7 @@ Code blocks (`_CodeBlock`) are NEVER split. If a code block exceeds `max_words`,
 
 Long prose blocks are split by sentences using regex `(?<=[.!?])\s+(?=[A-ZА-Я0-9`])`. Two overlap mechanisms exist:
 
-1. **Within a single prose block** (`_split_prose_for_overlap`): when a prose block exceeds `max_words`, the overlap is computed by taking the last `overlap_words * 6` characters of the accumulated text, then re-splitting those characters into sentences. This character-based approach ensures sentence boundaries are respected.
+1. **Within a single prose block** (`_split_prose_for_overlap`): when a prose block exceeds `max_words`, the overlap is computed by taking the last `overlap_words` words from the accumulated text, then re-splitting those words into sentences to respect boundaries.
 2. **Between accumulated blocks in a section** (`_split_section`): when the running chunk exceeds `max_words` and a new block would push it over, overlap is computed by taking the last `overlap_words` words from the raw text of all current blocks (`tail_text.split()[-overlap_words:]`).
 
 Overlap is prose-only: it is never carried across code block boundaries or section boundaries.
@@ -43,7 +43,6 @@ Overlap is prose-only: it is never carried across code block boundaries or secti
 | `_CodeBlock` | Yes | No |
 | `_ProseBlock` | No (sentence-split) | Yes |
 | `_ListBlock` | Yes | No |
-| `_TableBlock` | Yes | No |
 
 ## Chunk Metadata
 

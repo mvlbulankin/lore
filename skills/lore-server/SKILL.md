@@ -7,7 +7,7 @@ description: Local RAG documentation server for Spark, Delta and other framework
 
 ## Overview
 
-Lore is a local RAG server that indexes framework documentation (Spark, Delta) and serves search via REST API and MCP. Uses hybrid retrieval: BM25 keyword + ChromaDB vector, fused with RRF.
+Lore is a local RAG server that indexes framework documentation (Spark, Delta) and serves search via REST API and MCP. Uses hybrid retrieval: TF-IDF sparse + dense embeddings (fastembed ONNX) via Qdrant prefetch + Fusion.RRF. Self-contained — no external dependencies.
 
 ## When to Use
 
@@ -25,13 +25,13 @@ Lore is a local RAG server that indexes framework documentation (Spark, Delta) a
 
 1. **Check health:** `curl http://localhost:8000/health`
 2. **Start server:** `make up` (if not running)
-3. **Verify:** `chroma: true`, `bm25_loaded: true`, `collection_count > 0`
+3. **Verify:** `qdrant: true`, `sparse_model: true`, `collection_count > 0`
 
 ## API Reference
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/search` | Hybrid search (BM25 + Vector + RRF) |
+| `POST` | `/search` | Hybrid search (TF-IDF sparse + dense embeddings + RRF) |
 | `GET` | `/sources` | List available frameworks and documents |
 | `GET` | `/docs/{framework}/{path}` | Get full document content |
 | `GET` | `/health` | Server health check |
@@ -72,7 +72,8 @@ Search returns an array of hits:
     "heading": "Spark SQL > DataFrame API > Joins",
     "chunk_index": 3,
     "score": 0.42,
-    "snippet": "first 500 characters of matching content..."
+    "snippet": "first 500 characters of matching content...",
+    "parent_content": "first 2000 chars of parent section context"
   }
 ]
 ```
@@ -81,11 +82,9 @@ Search returns an array of hits:
 
 | Mistake | Fix |
 |---------|-----|
-| Empty results after ingest | Restart container: `make down && make up` |
-| `lm_studio: false` | Start LM Studio, verify API key in `.env` |
 | Search returns wrong framework | Use `framework` parameter in request |
-| `host.docker.internal` not resolving | Use host IP address in `LM_STUDIO_URL` |
 | Embed drift warning | Run `make ingest-clear` |
+| fastembed model not loading | Check network, verify `/data` is writable |
 
 ## Best Practices
 

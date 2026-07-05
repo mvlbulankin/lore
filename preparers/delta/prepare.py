@@ -20,21 +20,44 @@ from preparers._atomic import _atomic_publish
 
 
 KEEP_MDX = [
-    "delta-batch", "delta-streaming/index", "delta-update", "quick-start",
-    "delta-change-data-feed", "delta-spark-connect", "delta-clustering",
-    "delta-column-mapping", "delta-constraints", "delta-deletion-vectors",
-    "delta-faq", "delta-type-widening", "delta-uniform",
-    "delta-catalog-managed-tables", "delta-default-columns",
-    "delta-drop-feature", "delta-row-tracking", "versioning",
-    "table-properties", "concurrency-control", "delta-storage",
-    "best-practices", "optimizations-oss/index", "delta-utility/index",
+    "delta-batch",
+    "delta-streaming/index",
+    "delta-update",
+    "quick-start",
+    "delta-change-data-feed",
+    "delta-spark-connect",
+    "delta-clustering",
+    "delta-column-mapping",
+    "delta-constraints",
+    "delta-deletion-vectors",
+    "delta-faq",
+    "delta-type-widening",
+    "delta-uniform",
+    "delta-catalog-managed-tables",
+    "delta-default-columns",
+    "delta-drop-feature",
+    "delta-row-tracking",
+    "versioning",
+    "table-properties",
+    "concurrency-control",
+    "delta-storage",
+    "best-practices",
+    "optimizations-oss/index",
+    "delta-utility/index",
     "porting",
 ]
 
 KEEP_PY = [
-    "quickstart", "quickstart_sql", "quickstart_sql_on_paths",
-    "streaming", "utilities", "change_data_feed", "using_with_pip",
-    "delta_connect", "image_storage", "missing_delta_storage_jar",
+    "quickstart",
+    "quickstart_sql",
+    "quickstart_sql_on_paths",
+    "streaming",
+    "utilities",
+    "change_data_feed",
+    "using_with_pip",
+    "delta_connect",
+    "image_storage",
+    "missing_delta_storage_jar",
     "table_exists",
 ]
 
@@ -96,7 +119,9 @@ class DeltaPreparer:
         print(f"[delta] prepared {n} files")
 
     def _dry_run(self) -> None:
-        print(f"[delta] dry-run (source={self.source_dir}, prepared={self.prepared_dir})")
+        print(
+            f"[delta] dry-run (source={self.source_dir}, prepared={self.prepared_dir})"
+        )
         for src in self.discover():
             doc = self.transform(src)
             if doc is None:
@@ -136,7 +161,10 @@ class MDXConverter:
     @staticmethod
     def _remove_frontmatter(text: str) -> str:
         return re.sub(
-            r"^---\s*\n.*?^---\s*\n", "", text, count=1,
+            r"^---\s*\n.*?^---\s*\n",
+            "",
+            text,
+            count=1,
             flags=re.DOTALL | re.MULTILINE,
         )
 
@@ -149,6 +177,7 @@ class MDXConverter:
             label = m.group(1)
             content = m.group(2).strip()
             return f"\n#### {label}\n\n{content}\n"
+
         pattern = r"<TabItem\s+label=\"([^\"]+)\"[^>]*>\s*\n([\s\S]*?)\n\s*</TabItem>"
         return re.sub(pattern, replacer, text)
 
@@ -164,6 +193,7 @@ class MDXConverter:
             lines = content.split("\n")
             quoted = [f"> {line}" if line.strip() else ">" for line in lines]
             return "\n" + "\n".join(quoted) + "\n"
+
         pattern = r"<Aside[^>]*>\s*\n([\s\S]*?)\n</Aside>"
         return re.sub(pattern, replacer, text, flags=re.DOTALL)
 
@@ -202,7 +232,9 @@ PREPARER = DeltaPreparer()
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Delta Lake docs preparer (standalone)")
+    parser = argparse.ArgumentParser(
+        description="Delta Lake docs preparer (standalone)"
+    )
     parser.add_argument("--source-root", type=Path, default=Path("data/source"))
     parser.add_argument("--prepared-root", type=Path, default=Path("data/prepared"))
     parser.add_argument("--execute", action="store_true")
