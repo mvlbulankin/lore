@@ -24,8 +24,8 @@ class FastEmbedEmbedder:
             return []
         results: list[list[float]] = []
         for text in texts:
-            vec = list(self._model.embed([text]))[0]
-            results.append(vec.tolist())
+            vec = next(self._model.embed([text])).tolist()
+            results.append(vec)
         if self._dimension is None and results:
             self._dimension = len(results[0])
         return results

@@ -26,7 +26,7 @@ __pycache__/
 .DS_Store
 
 # Generated data artifacts
-# data/qdrant_storage/
-# data/prepared/
-# data/hf_cache/
-# data/fastembed_cache/
+data/qdrant_storage/
+data/prepared/
+data/hf_cache/
+data/fastembed_cache/
