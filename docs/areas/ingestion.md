@@ -35,8 +35,14 @@ discover → chunk → pickle cache → TF-IDF fit → per-file: reload → embe
 ## Memory Optimization
 
 The ingest workflow constructs a single `Embedder` at startup and reuses it
-across all files. Embeddings are computed per-chunk via `embed_sync([chunk.content])`.
+across all files. Embeddings are computed one chunk at a time via
+`embed_sync([chunk.content])` with an individual `client.upsert()` per chunk.
+This intentionally avoids batch processing to prevent OOM on memory-constrained
+machines — the trade-off is slower ingest speed for predictable memory usage.
+
 Chunks are streamed to a pickle cache to avoid holding the entire corpus in RAM.
+
+**Performance:** initial ingest on Ryzen 5 5600 / 16 GB RAM (RRD4) takes ~100 s.
 
 ## Chunk Pickle Cache
 
