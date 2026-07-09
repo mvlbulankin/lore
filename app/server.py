@@ -27,7 +27,7 @@ mcp_app = mcp.http_app(path="/")
 
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
-    embedder = Embedder()
+    embedder = Embedder(model_name=settings.embedding_model)
     retriever = QdrantRetriever(embedder=embedder)
     app.state.embedder = embedder
     app.state.retriever = retriever

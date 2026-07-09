@@ -57,6 +57,8 @@ embedder = Embedder()
 embedder = Embedder(model_name="sentence-transformers/all-MiniLM-L6-v2")
 ```
 
+> **Important:** Both the server (`app/server.py`) and ingest (`ingestion/ingest.py`) must use the same model. The server creates its embedder in `app_lifespan()` and should pass `model_name=settings.embedding_model` to ensure consistency with ingest. If they diverge, search results will be incorrect because the query vectors won't match the indexed vectors.
+
 ## Configuration
 
 | Env Var | Default | Description |

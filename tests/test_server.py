@@ -282,3 +282,19 @@ async def test_app_lifespan() -> None:
     async with _run():
         assert hasattr(app.state, "retriever")
         assert hasattr(app.state, "embedder")
+
+
+@pytest.mark.anyio
+async def test_embedder_uses_configured_model() -> None:
+    """Embedder in lifespan is created with settings.embedding_model."""
+    from contextlib import asynccontextmanager
+    from app.server import app_lifespan
+
+    @asynccontextmanager
+    async def _run():
+        async with app_lifespan(app):
+            yield
+
+    async with _run():
+        embedder = app.state.embedder
+        assert embedder._model.model.model_name == settings.embedding_model

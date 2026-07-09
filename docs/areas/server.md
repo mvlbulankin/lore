@@ -11,7 +11,7 @@ Single FastAPI application that mounts FastMCP at `/mcp`. Both MCP tools and RES
 ```python
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
-    embedder = Embedder()
+    embedder = Embedder(model_name=settings.embedding_model)
     retriever = QdrantRetriever(embedder=embedder)
     app.state.embedder = embedder
     app.state.retriever = retriever

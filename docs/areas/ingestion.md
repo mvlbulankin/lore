@@ -17,7 +17,7 @@ discover → chunk → pickle cache → TF-IDF fit → per-file: reload → embe
 3. **TF-IDF** — `SparseBuilder.fit_build(texts)` on all chunk texts, then free texts
 4. **Qdrant init** — create collection if missing; optionally clear with `--clear`
 5. **Save sparse model** — single write to `sparse_model.pkl`
-6. **Per-file processing** — reload chunks from cache, embed via fastembed (local ONNX), build sparse, upsert to Qdrant
+6. **Per-file processing** — reload chunks from cache for the selected framework (or all if `--framework` is not specified), embed via fastembed (local ONNX), build sparse, upsert to Qdrant. Note: Phase 1 always chunks ALL files and Phase 2 builds the sparse model on the full corpus, regardless of `--framework`. The filter only affects which chunks are upserted in Phase 4.
 7. **Cleanup** — cache directory removed in `finally` block
 
 ## Embedder
