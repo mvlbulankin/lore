@@ -3,83 +3,85 @@
 [![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/release/python-3140/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Локальный RAG-сервер документации с MCP-интерфейсом для агентов.
+Local RAG documentation server with MCP interface for AI agents.
 
-Один Docker-контейнер: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP.
-Эмбеддинги через local fastembed/ONNX (без внешнего API, без GPU).
+One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP.
+Embeddings via local fastembed/ONNX (no external API, no GPU).
 
-## Архитектура
+## Architecture
 
-| Слой | Решение |
+| Layer | Solution |
 |------|---------|
 | Vector DB | Qdrant embedded `AsyncQdrantClient` (in-process) |
-| Embedding | Local fastembed/ONNX (via fastembed, без GPU) |
+| Embedding | Local fastembed/ONNX (via fastembed, no GPU) |
 | Retrieval | Hybrid: TF-IDF sparse + dense embeddings + RRF (server-side via Qdrant prefetch + FusionQuery) |
-| Chunking | Code-aware: H1>H2>H3 chain, atomic code-fence, prose с overlap |
-| Container | Один образ ~500MB (python:3.14-slim + uv + ONNX runtime) |
+| Chunking | Code-aware: H1>H2>H3 chain, atomic code-fence, prose with overlap |
+| Container | Single image ~500MB (python:3.14-slim + uv + ONNX runtime) |
 | Pipeline | `{framework}-docs-extractor/` → `data/docs/` → `ingestion/` → Qdrant |
 
-## Требования
+## Requirements
 
-- **Docker** — для контейнера lore
-- **uv** — менеджер пакетов Python
+- **Docker** — for the lore container
+- **uv** — Python package manager
 - **Python 3.14**
 
 ## Quick Start
 
 ```bash
-# 1. Настроить .env
+# 1. Configure .env
 cp .env.example .env
 
-# 2. Подготовить документы
-make prepare
+# 2. Prepare documents
+make prepare-delta
+make prepare-spark
 
-# 3. Запустить контейнер
+# 3. Start container
 make up
 
-# 4. Проверить здоровье
+# 4. Check health
 curl http://localhost:8000/health
 
-# 5. Проиндексировать
+# 5. Ingest
 make ingest
 
-# 6. Поиск
+# 6. Search
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
   -d '{"query": "your query", "framework": "spark", "limit": 5}'
 ```
 
-## Команды
+## Commands
 
-| Команда | Описание |
+| Command | Description |
 |---------|----------|
-| `make install` | Установка зависимостей |
-| `make up` | Запуск контейнера |
-| `make down` | Остановка контейнера |
-| `make prepare` | Подготовить все фреймворки |
-| `make ingest` | Индексация документов |
-| `make ingest-clear` | Очистить и заново проиндексировать |
-| `make test` | Запуск тестов |
-| `make logs` | Логи контейнера |
-| `make clean` | Удалить контейнер, volumes, venv |
+| `make install` | Install dependencies |
+| `make up` | Start container |
+| `make down` | Stop container |
+| `make prepare-delta` | Run delta-lake-docs-extractor, copy to data/docs/delta/ |
+| `make prepare-spark` | Run spark-docs-extractor, copy to data/docs/spark/ |
+| `make ingest` | Index documents |
+| `make ingest-clear` | Clear collection and reindex |
+| `make test` | Run tests |
+| `make logs` | Container logs |
+| `make clean` | Remove container, volumes, venv |
 
-## Документация
+## Documentation
 
-| Файл | Описание |
+| File | Description |
 |------|----------|
 | [docs/areas/embedder.md](docs/areas/embedder.md) | FastEmbedEmbedder, local ONNX |
 | [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, hybrid dense+sparse, RRF, parent-child dedup |
 | [docs/areas/chunker.md](docs/areas/chunker.md) | Code-aware chunking |
-| [docs/areas/extractors.md](docs/superpowers/specs/2025-07-29-external-extractors-design.md) | External documentation extractors |
+| [docs/superpowers/specs/2025-07-29-external-extractors-design.md](docs/superpowers/specs/2025-07-29-external-extractors-design.md) | External documentation extractors |
 | [docs/areas/ingestion.md](docs/areas/ingestion.md) | Ingest workflow, embedder |
 | [docs/areas/server.md](docs/areas/server.md) | FastAPI, FastMCP, endpoints |
-| [docs/architecture.md](docs/architecture.md) | Детальная архитектура |
-| [docs/testing.md](docs/testing.md) | Тесты |
+| [docs/architecture.md](docs/architecture.md) | Detailed architecture |
+| [docs/testing.md](docs/testing.md) | Tests |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Troubleshooting |
 
 ## MCP
 
-Добавить в конфигурацию MCP-клиента:
+Add to your MCP client configuration:
 
 ```json
 {
@@ -93,4 +95,4 @@ curl -X POST http://localhost:8000/search \
 }
 ```
 
-Доступные инструменты: `search_docs`, `get_document`, `list_sources`.
+Available tools: `search_docs`, `get_document`, `list_sources`.
