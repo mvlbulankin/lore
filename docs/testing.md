@@ -20,12 +20,12 @@ uv run pytest -k "parent" -v                  # keyword filter
 | `test_retriever.py` | 8 | Qdrant collection, framework filter, prefetch + Fusion.RRF, sparse model, parent dedup, path traversal |
 | `test_embedder.py` | 7 | FastEmbedEmbedder init, embed_sync, embed, embed_one, dimension detection |
 | `test_config.py` | 2 | Settings defaults, overlap validation |
-| `test_ingest.py` | 17 | File discovery, chunking, TF-IDF, Qdrant upsert, clear flag, cache cleanup |
+| `test_ingest.py` | 18 | File discovery, chunking, TF-IDF, Qdrant upsert, clear flag, cache cleanup |
 | `test_integration.py` | 7 | End-to-end: ingest + search, model info, framework isolation |
-| `test_server.py` | 9 | REST endpoints, lifespan, search, sources, docs, health |
+| `test_server.py` | 10 | REST endpoints, lifespan, search, sources, docs, health |
 | `test_mcp_tools.py` | 7 | MCP tool registration, tool listing |
 
-**Total: 98 tests, coverage >= 55% required.**
+**Total: 99 tests, coverage >= 55% required.**
 
 ## Test Categories
 
