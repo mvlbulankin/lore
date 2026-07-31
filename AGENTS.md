@@ -43,12 +43,12 @@ lore/
 │   ├── test_chunker.py         # 35 tests
 │   ├── test_config.py          # 2 tests
 │   ├── test_embedder.py        # 7 tests
-│   ├── test_ingest.py          # 17 tests
+│   ├── test_ingest.py          # 18 tests
 │   ├── test_integration.py     # 7 tests
 │   ├── test_mcp_tools.py       # 7 tests
 │   ├── test_sparse_builder.py  # 6 tests
 │   ├── test_retriever.py       # 8 tests
-│   └── test_server.py          # 9 tests
+│   └── test_server.py          # 10 tests
 ├── docs/
 │   ├── areas/                  # per-component documentation
 │   │   ├── embedder.md
@@ -84,6 +84,7 @@ lore/
 | `make ingest-clear` | Clear collection, then reindex |
 | `make logs` | Container logs (follow) |
 | `make test` | Run tests |
+| `make ruff` | Lint and auto-fix (`ruff check --fix`) |
 | `make clean` | Remove container, volumes, venv, prepared |
 
 ## Environment Variables
