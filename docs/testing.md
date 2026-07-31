@@ -25,7 +25,7 @@ uv run pytest -k "parent" -v                  # keyword filter
 | `test_server.py` | 10 | REST endpoints, lifespan, search, sources, docs, health |
 | `test_mcp_tools.py` | 7 | MCP tool registration, tool listing |
 
-**Total: 99 tests, coverage >= 55% required.**
+**Total: 100 tests, coverage >= 55% required.**
 
 ## Test Categories
 
