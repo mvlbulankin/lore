@@ -1,17 +1,17 @@
-# Тесты
+# Tests
 
 ```bash
-make test                              # все тесты
-uv run pytest tests/test_chunker.py -v  # только чанкер
+make test                              # all tests
+uv run pytest tests/test_chunker.py -v  # chunker only
 ```
 
-## Что покрыто
+## Coverage
 
-| Файл | Тестов | Что проверяет |
+| File | Tests | Covers |
 |---|---|---|
-| `test_chunker.py` | 35 | Heading chain, H4-labels, code-блоки атомарны, overlap только для prose, parent-child, `is_last_chunk`, метаданные |
+| `test_chunker.py` | 35 | Heading chain, H4-labels, code blocks are atomic, overlap for prose only, parent-child, `is_last_chunk`, metadata |
 
-## Требования
+## Requirements
 
 - Python 3.14
-- Зависимости из `[dependency-groups].dev` в `pyproject.toml` (`pytest`, `ruff`)
+- Dependencies from `[dependency-groups].dev` in `pyproject.toml` (`pytest`, `ruff`)
