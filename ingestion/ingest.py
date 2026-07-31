@@ -156,6 +156,7 @@ def main() -> None:
         # Phase 4: process one document at a time
         point_id = 0
         total_upserted = 0
+        upserted_ids: list[int] = []
 
         for fw, rel in files:
             cache_path = cache_files.pop((fw, rel))
@@ -194,6 +195,7 @@ def main() -> None:
                     },
                 )
                 client.upsert(collection_name=collection, points=[point], wait=True)
+                upserted_ids.append(point_id)
                 point_id += 1
                 total_upserted += 1
 
@@ -215,6 +217,22 @@ def main() -> None:
                 f,
                 indent=2,
             )
+    except Exception:
+        if upserted_ids:
+            log.error(
+                "phase_4_failed_rolling_back",
+                count=len(upserted_ids),
+                ids=upserted_ids,
+            )
+            try:
+                client.delete(
+                    collection_name=collection,
+                    points_selector=upserted_ids,
+                )
+                log.info("rollback_complete", count=len(upserted_ids))
+            except Exception as rollback_err:
+                log.error("rollback_failed", error=str(rollback_err))
+        raise
     finally:
         del embedder
         client.close()

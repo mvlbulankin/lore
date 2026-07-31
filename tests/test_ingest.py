@@ -7,6 +7,8 @@ import pickle
 import sys
 from pathlib import Path
 
+import pytest
+
 
 # ingestion/ uses PYTHONPATH="/app:/app/ingestion" inside Docker;
 # replicate that so `from chunker import make_chunks` resolves.
@@ -316,3 +318,108 @@ def test_cache_cleanup_on_exception(tmp_path: Path) -> None:
         _cleanup_cache(cache_dir)
 
     assert not cache_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# Rollback on Phase 4 failure
+# ---------------------------------------------------------------------------
+
+
+def test_partial_upsert_rolled_back_on_exception(tmp_path: Path, monkeypatch) -> None:
+    """If upsert fails mid-batch, partial points are deleted from the collection."""
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import (
+        Distance,
+        SparseIndexParams,
+        SparseVector,
+        SparseVectorParams,
+        VectorParams,
+    )
+
+    from docs_shared.sparse_builder import SparseBuilder
+    from ingestion.ingest import main
+
+    docs_dir = tmp_path / "docs"
+    (docs_dir / "test").mkdir(parents=True)
+    (docs_dir / "test" / "a.md").write_text("# A\n\nContent A.")
+    (docs_dir / "test" / "b.md").write_text("# B\n\nContent B.")
+
+    qdrant_path = str(tmp_path / "qdrant")
+    collection = "test_rollback"
+
+    # Create client, set up collection, then close so main() can reopen it
+    client = QdrantClient(path=qdrant_path)
+    client.create_collection(
+        collection,
+        vectors_config={
+            "dense": VectorParams(size=384, distance=Distance.COSINE),
+        },
+        sparse_vectors_config={
+            "sparse": SparseVectorParams(
+                index=SparseIndexParams(on_disk=True),
+            ),
+        },
+    )
+    client.close()
+
+    call_count = [0]
+    deleted_points = []
+
+    def failing_upsert(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] >= 2:
+            raise RuntimeError("simulated upsert failure")
+
+    def tracking_delete(*args, **kwargs):
+        deleted_points.append(kwargs.get("points_selector", args[1] if len(args) > 1 else None))
+
+    # Patch QdrantClient constructor to return our tracked client
+    tracked_client = QdrantClient(path=qdrant_path)
+    tracked_client.upsert = failing_upsert
+    tracked_client.delete = tracking_delete
+
+    def fake_qdrant_client(*args, **kwargs):
+        return tracked_client
+
+    monkeypatch.setattr("ingestion.ingest.QdrantClient", fake_qdrant_client)
+
+    fake_dim = 384
+
+    class FakeEmbedder:
+        def embed_sync(self, texts):
+            return [[0.1] * fake_dim for _ in texts]
+
+    monkeypatch.setattr("docs_shared.embedder.Embedder", FakeEmbedder)
+
+    def fake_fit_build(self, texts):
+        pass
+
+    def fake_build(self, texts):
+        return [SparseVector(indices=[0, 1], values=[1.0, 0.5]) for _ in texts]
+
+    monkeypatch.setattr(SparseBuilder, "fit_build", fake_fit_build)
+    monkeypatch.setattr(SparseBuilder, "build", fake_build)
+    monkeypatch.setattr(SparseBuilder, "save", lambda self, path: None)
+
+    monkeypatch.setattr(
+        "docs_shared.config.settings.prepared_dir", str(docs_dir)
+    )
+    monkeypatch.setattr(
+        "docs_shared.config.settings.qdrant_storage_path", qdrant_path
+    )
+    monkeypatch.setattr(
+        "docs_shared.config.settings.qdrant_collection", collection
+    )
+    monkeypatch.setattr("docs_shared.config.settings.chunk_max_words", 512)
+    monkeypatch.setattr("docs_shared.config.settings.chunk_overlap_words", 64)
+    monkeypatch.setattr("sys.argv", ["ingest"])
+
+    with pytest.raises(RuntimeError, match="simulated upsert failure"):
+        main()
+
+    # Verify that delete was called to clean up the 1 point that was upserted
+    assert len(deleted_points) == 1, f"Expected 1 delete call, got {len(deleted_points)}"
+    selector = deleted_points[0]
+    assert isinstance(selector, list), f"Expected list of point IDs, got {type(selector)}"
+    assert len(selector) == 1, f"Expected 1 point ID deleted, got {len(selector)}"
+    assert selector == [0]
