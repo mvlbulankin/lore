@@ -206,17 +206,6 @@ def main() -> None:
 
         log.info("qdrant_upserted", count=total_upserted)
 
-        # Save embedding model metadata for drift detection
-        model_info_path = Path(qdrant_path) / ".model_info.json"
-        with open(model_info_path, "w") as f:
-            json.dump(
-                {
-                    "embedding_model": settings.embedding_model,
-                    "embedding_dim": settings.embedding_dim,
-                },
-                f,
-                indent=2,
-            )
     except Exception:
         if upserted_ids:
             log.error(
@@ -238,6 +227,18 @@ def main() -> None:
         client.close()
         _cleanup_cache(chunks_cache_dir)
         gc.collect()
+
+    # Save embedding model metadata for drift detection
+    model_info_path = Path(qdrant_path) / ".model_info.json"
+    with open(model_info_path, "w") as f:
+        json.dump(
+            {
+                "embedding_model": settings.embedding_model,
+                "embedding_dim": settings.embedding_dim,
+            },
+            f,
+            indent=2,
+        )
 
 
 if __name__ == "__main__":
