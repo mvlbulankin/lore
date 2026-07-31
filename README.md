@@ -72,7 +72,6 @@ curl -X POST http://localhost:8000/search \
 | [docs/areas/embedder.md](docs/areas/embedder.md) | FastEmbedEmbedder, local ONNX |
 | [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, hybrid dense+sparse, RRF, parent-child dedup |
 | [docs/areas/chunker.md](docs/areas/chunker.md) | Code-aware chunking |
-| [docs/superpowers/specs/2025-07-29-external-extractors-design.md](docs/superpowers/specs/2025-07-29-external-extractors-design.md) | External documentation extractors |
 | [docs/areas/ingestion.md](docs/areas/ingestion.md) | Ingest workflow, embedder |
 | [docs/areas/server.md](docs/areas/server.md) | FastAPI, FastMCP, endpoints |
 | [docs/architecture.md](docs/architecture.md) | Detailed architecture |
