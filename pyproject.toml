@@ -28,9 +28,6 @@ members = ["docs_shared"]
 [tool.uv.sources]
 docs-shared = { workspace = true }
 
-[tool.ruff]
-exclude = ["data/source"]
-
 [tool.pytest.ini_options]
 pythonpath = ["."]
 
@@ -39,7 +36,7 @@ packages = ["."]
 
 [tool.coverage.run]
 branch = true
-source = ["app", "docs_shared", "ingestion", "preparers"]
+source = ["app", "docs_shared", "ingestion"]
 
 [tool.coverage.report]
 show_missing = true

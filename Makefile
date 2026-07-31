@@ -1,4 +1,11 @@
-.PHONY: install lock up down rebuild shell prepare prepare-spark prepare-delta prepare-dry-run ingest ingest-clear logs test clean
+SHELL := /bin/bash
+PYTHON := python
+WORKSPACE := $(shell cd .. && pwd)
+DATA_DIR := data/docs
+
+.PHONY: all prepare-delta prepare-spark ingest ingest-clear logs test ruff clean
+
+all: prepare-delta prepare-spark ingest-clear
 
 install:
 	uv sync
@@ -18,17 +25,17 @@ shell:
 down:
 	docker compose down
 
-prepare:
-	uv run python -m preparers.cli --execute
+prepare-delta:
+	@echo "==> Running delta-lake-docs-extractor"
+	$(MAKE) -C $(WORKSPACE)/delta-lake-docs-extractor run
+	@mkdir -p $(DATA_DIR)/delta
+	@cp -r $(WORKSPACE)/delta-lake-docs-extractor/output/delta/* $(DATA_DIR)/delta/
 
 prepare-spark:
-	uv run python -m preparers.cli --framework spark --execute
-
-prepare-delta:
-	uv run python -m preparers.cli --framework delta --execute
-
-prepare-dry-run:
-	uv run python -m preparers.cli
+	@echo "==> Running spark-docs-extractor"
+	$(MAKE) -C $(WORKSPACE)/spark-docs-extractor run
+	@mkdir -p $(DATA_DIR)/spark
+	@cp -r $(WORKSPACE)/spark-docs-extractor/output/spark/* $(DATA_DIR)/spark/
 
 ingest:
 	docker compose run --rm lore sh -c 'PYTHONPATH=/app python /app/ingestion/ingest.py'
@@ -40,15 +47,17 @@ logs:
 	docker compose logs -f lore
 
 test:
-	uv run pytest --cov=app --cov=docs_shared --cov=ingestion --cov=preparers --cov-report=term-missing
+	uv run pytest --cov=app --cov=docs_shared --cov=ingestion --cov-report=term-missing
 
 ruff:
 	uv run ruff check --fix
 
 clean:
 	docker compose down -v
+	rm -rf $(DATA_DIR)/*
+	$(MAKE) -C $(WORKSPACE)/delta-lake-docs-extractor clean
+	$(MAKE) -C $(WORKSPACE)/spark-docs-extractor clean
 	rm -rf data/qdrant_storage/*
-	rm -rf data/prepared/delta data/prepared/spark data/prepared/test
 	rm -rf data/hf_cache
 	rm -f data/bm25.pkl
 	rm -rf .venv

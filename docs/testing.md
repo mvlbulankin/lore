@@ -15,7 +15,7 @@ uv run pytest -k "parent" -v                  # keyword filter
 | File | Tests | Coverage |
 |------|-------|----------|
 | `test_chunker.py` | 35 | Heading chain, H4-labels, code atomicity, prose overlap, `is_last_chunk`, metadata, block parsing, parent-child chunking |
-| `test_preparer_base.py` | 12 | Protocol conformance, atomic rename, dry-run, registry discovery, spark preparer helpers |
+
 | `test_sparse_builder.py` | 6 | TF-IDF fit/build, encode_query, save/load, error handling |
 | `test_retriever.py` | 8 | Qdrant collection, framework filter, prefetch + Fusion.RRF, sparse model, parent dedup, path traversal |
 | `test_embedder.py` | 7 | FastEmbedEmbedder init, embed_sync, embed, embed_one, dimension detection |
@@ -25,7 +25,7 @@ uv run pytest -k "parent" -v                  # keyword filter
 | `test_server.py` | 9 | REST endpoints, lifespan, search, sources, docs, health |
 | `test_mcp_tools.py` | 7 | MCP tool registration, tool listing |
 
-**Total: 110 tests, coverage >= 55% required.**
+**Total: 98 tests, coverage >= 55% required.**
 
 ## Test Categories
 
@@ -53,17 +53,6 @@ uv run pytest -k "parent" -v                  # keyword filter
 - **prefetch_fusion_rrf** — `Prefetch` + `FusionQuery(fusion=Fusion.RRF)` returns results
 - **sparse_model** — save/load round-trip works
 - **parent_dedup** — keeps highest-scoring child per parent
-
-### Preparer Tests (`test_preparer_base.py`)
-
-- **Protocol** — `_FakePreparer` satisfies `FrameworkPreparer`
-- **Discovery** — returns correct paths
-- **Transform** — returns `PreparedDoc` with correct fields
-- **Atomic rename** — staging → rename → cleanup, no leftover directories
-- **Dry-run** — no files written when `execute=False`
-- **Re-execute** — replaces previous output
-- **Registry** — discovers all registered preparers, filters by framework
-- **Spark helpers** — redirect stub filter, notebook cell cleanup, empty fence cleanup, language default
 
 ### Embedder Tests (`test_embedder.py`)
 
@@ -115,7 +104,7 @@ uv run pytest -k "parent" -v                  # keyword filter
 1. Chunker tests: import from `ingestion.chunker`, use `make_chunks()` with synthetic markdown
 2. Sparse builder tests: import from `ingestion.sparse_builder`, use `SparseBuilder()`
 3. Retriever tests: use QdrantClient with `path=tempfile.TemporaryDirectory()`
-4. Preparer tests: create `_FakePreparer` or use real preparers with `tmp_path` fixtures
+4. Extractor tests: run `pytest` in `{framework}-docs-extractor/`
 5. Use `pytest.fixture` for temporary directories and source files
 
 ## Pre-commit Checklist

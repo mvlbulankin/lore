@@ -13,7 +13,7 @@ Reads `.env` file automatically when present.
 | `embedding_dim` | `int` | `384` | Embedding vector dimension (for Qdrant collection creation) |
 | `qdrant_storage_path` | `str` | `/data/qdrant_storage` | Qdrant embedded storage path |
 | `qdrant_collection` | `str` | `docs` | Qdrant collection name |
-| `prepared_dir` | `str` | `/data/prepared` | Prepared documents directory |
+| `prepared_dir` | `str` | `/data/docs` | Framework documentation directory |
 | `chunk_max_words` | `int` | `800` | Maximum words per chunk |
 | `chunk_overlap_words` | `int` | `80` | Overlap words between prose chunks (must be < `chunk_max_words`) |
 | `parent_level` | `int` | `2` | Heading level for parent section boundary |
@@ -36,7 +36,7 @@ A `model_validator` ensures `chunk_overlap_words < chunk_max_words`. Invalid con
 | `docs_shared/sparse_builder.py` | none (standalone) |
 | `docs_shared/retriever.py` | `qdrant_storage_path`, `qdrant_collection`, `embedding_model`, `embedding_dim`, `search_fetch_multiplier`, `search_fetch_min` |
 | `app/server.py` | `snippet_max_chars`, `parent_content_max_chars`, `cors_origins` |
-| `preparers/` | Not used (host-side, reads from filesystem) |
+| `delta-lake-docs-extractor/` | Not used (external, host-side) |
 
 ## Additional Env Vars (not in Settings)
 

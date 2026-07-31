@@ -20,16 +20,16 @@ make up
 
 ## Empty Search Results
 
-1. Verify `data/prepared/{framework}/` contains `.md` files
+1. Verify `data/docs/{framework}/` contains `.md` files
 2. Verify documents are indexed: `make down && make ingest && make up`
 3. Check `sparse_model: true` in `/health`
 4. Check sources: `curl http://localhost:8000/sources`
 
-## Preparation Finds No Source Files
+## Extractor Produces No Output
 
-Verify files are in `data/source/{framework}/` in the format the preparer expects:
-- Spark: `data/source/spark/docs/*.md`
-- Delta: `data/source/delta/docs/src/content/docs/*.mdx` + `data/source/delta/examples/python/*.py`
+Verify the extractor runs successfully from the workspace root:
+- Spark: `cd pyspark-docs-extractor && uv run python main.py`
+- Delta: `cd delta-lake-docs-extractor && uv run python main.py`
 
 ## After Chunking Update — Old Indexes Incompatible
 
@@ -77,6 +77,6 @@ Container runs as `lore` user with `PYTHONPATH="/app:/app/ingestion"`. Verify:
 - `Dockerfile` sets `ENV PYTHONPATH="/app:/app/ingestion"`
 - Makefile ingest targets use `sh -c 'PYTHONPATH=/app ...'` — Python's implicit `sys.path[0]` adds the script's directory (`/app/ingestion`) at runtime
 
-## Preparation: "directory not found"
+## Extraction: "directory not found"
 
-Verify `data/source/{framework}/` exists. Check path with `make prepare-dry-run`.
+Verify `{framework}-docs-extractor/` exists in the workspace parent directory.

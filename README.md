@@ -17,7 +17,7 @@
 | Retrieval | Hybrid: TF-IDF sparse + dense embeddings + RRF (server-side via Qdrant prefetch + FusionQuery) |
 | Chunking | Code-aware: H1>H2>H3 chain, atomic code-fence, prose с overlap |
 | Container | Один образ ~500MB (python:3.14-slim + uv + ONNX runtime) |
-| Pipeline | `data/source/` → `preparers/` → `data/prepared/` → `ingestion/` → Qdrant |
+| Pipeline | `{framework}-docs-extractor/` → `data/docs/` → `ingestion/` → Qdrant |
 
 ## Требования
 
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8000/search \
 | [docs/areas/embedder.md](docs/areas/embedder.md) | FastEmbedEmbedder, local ONNX |
 | [docs/areas/retriever.md](docs/areas/retriever.md) | QdrantRetriever, hybrid dense+sparse, RRF, parent-child dedup |
 | [docs/areas/chunker.md](docs/areas/chunker.md) | Code-aware chunking |
-| [docs/areas/preparers.md](docs/areas/preparers.md) | FrameworkPreparer, pipeline |
+| [docs/areas/extractors.md](docs/superpowers/specs/2025-07-29-external-extractors-design.md) | External documentation extractors |
 | [docs/areas/ingestion.md](docs/areas/ingestion.md) | Ingest workflow, embedder |
 | [docs/areas/server.md](docs/areas/server.md) | FastAPI, FastMCP, endpoints |
 | [docs/architecture.md](docs/architecture.md) | Детальная архитектура |

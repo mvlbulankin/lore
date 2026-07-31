@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     embedding_dim: int = Field(default=384, gt=0)
     qdrant_storage_path: str = "/data/qdrant_storage"
     qdrant_collection: str = "docs"
-    prepared_dir: str = "/data/prepared"
+    prepared_dir: str = "/data/docs"
 
     chunk_max_words: int = Field(default=800, gt=0)
     chunk_overlap_words: int = 80

@@ -3,13 +3,12 @@
 ## Pipeline
 
 ```
-data/source/  ──►  preparers/  ──►  data/prepared/  ──►  ingestion  ──►  Qdrant
-   (raw)          (host, uv)        (clean .md)         (docker)         (search index)
+{framework}-docs-extractor/  ──►  data/docs/  ──►  ingestion  ──►  Qdrant
+      (host, uv)                (clean .md)       (docker)         (search index)
 ```
 
-1. **Source** — raw documentation in framework-specific formats (Jekyll, MDX, Python)
-2. **Preparers** — per-framework transformers that clean and normalize to standard Markdown. Runs on host via `uv`.
-3. **Prepared** — clean `.md` files in `data/prepared/{framework}/`. Atomic publish via staging + rename.
+1. **Extractors** — external repos (`delta-lake-docs-extractor/`, `pyspark-docs-extractor/`) fetch raw documentation and produce clean Markdown. Run on host via `uv`.
+2. **Docs** — clean `.md` files in `data/docs/{framework}/`. Copied from extractor output by `make prepare-{framework}`.
 4. **Ingestion** — runs in Docker container: chunks, embeds locally (fastembed/ONNX), builds TF-IDF sparse vectors, upserts to Qdrant.
 5. **Search** — server queries Qdrant (dense + sparse vectors), fuses with server-side RRF, deduplicates by parent section.
 
@@ -37,7 +36,7 @@ data/source/  ──►  preparers/  ──►  data/prepared/  ──►  inges
 
 ## Data Flow
 
-1. `ingest.py` discovers `.md` files in `data/prepared/`
+1. `ingest.py` discovers `.md` files in `data/docs/`
 2. `chunker.py` parses each file: heading chain, code blocks, prose splitting, parent-child assignment
 3. Chunks streamed to pickle cache on disk
 4. `sparse_builder.py` builds TF-IDF sparse vectors over all chunk text
@@ -76,6 +75,6 @@ Single Docker image: `python:3.14-slim` + `uv`. Runs as non-root `lore` user. ~8
 | Local embeddings | fastembed/ONNX — no external API, no GPU required, self-contained |
 | TF-IDF sparse vectors | BM25-like keyword search via scikit-learn, stored natively in Qdrant |
 | Parent-child chunking | Small chunks for search precision, parent content for context |
-| Atomic preparer publish | Ingest always sees consistent snapshot |
+| External extractors | Each framework's extraction logic is independently versioned and tested |
 | Code-aware chunking | Preserves code block semantics for RAG |
 | Pickle chunk cache | Avoids holding entire corpus in RAM during ingest |

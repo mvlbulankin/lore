@@ -7,7 +7,7 @@ Local RAG documentation server with MCP interface for AI agents.
 One Docker container: Qdrant (embedded, in-process) + FastAPI (REST) + FastMCP. Dense embeddings via local fastembed/ONNX (no external API, no GPU). TF-IDF sparse vectors via scikit-learn. Hybrid retrieval: dense + sparse + RRF fusion (server-side).
 
 ```
-data/source/ → preparers/ → data/prepared/ → ingestion/ → Qdrant (dense + sparse)
+{framework}-docs-extractor/ → data/docs/ → ingestion/ → Qdrant (dense + sparse)
 ```
 
 ## Project Structure
@@ -22,12 +22,9 @@ lore/
 ├── pyproject.toml              # uv workspace root
 ├── uv.lock                     # lock file
 ├── data/
-│   ├── source/                 # raw docs (Jekyll, MDX, Python) — READ-ONLY
-│   │   ├── spark/docs/
-│   │   ├── delta/docs/
-│   │   ├── delta/examples/
-│   │   └── test/
-│   ├── prepared/               # output of preparers (clean .md)
+│   ├── docs/                   # framework documentation (output of external extractors)
+│   │   ├── delta/
+│   │   └── spark/
 │   └── qdrant_storage/         # Qdrant embedded storage + sparse model
 ├── docs_shared/                # shared package (workspace member)
 │   ├── config.py               # Settings from env vars
@@ -36,14 +33,6 @@ lore/
 │   ├── embedder.py             # FastEmbedEmbedder (local ONNX via fastembed)
 │   ├── retriever.py            # QdrantRetriever, async, dense + sparse + RRF
 │   └── sparse_builder.py       # TF-IDF → Qdrant sparse vectors
-├── preparers/                  # host-side document preparation
-│   ├── base.py                 # FrameworkPreparer Protocol
-│   ├── registry.py             # auto-discovery
-│   ├── cli.py                  # CLI entry point
-│   ├── _atomic.py              # staging + atomic rename
-│   ├── delta/prepare.py        # MDX + Python → MD
-│   ├── spark/prepare.py        # Jekyll cleanup
-│   └── test/prepare.py         # trivial copy
 ├── ingestion/                  # runs inside Docker container
 │   ├── chunker.py              # code-aware markdown chunker (parent-child)
 │   └── ingest.py               # main ingest workflow
@@ -57,7 +46,6 @@ lore/
 │   ├── test_ingest.py          # 17 tests
 │   ├── test_integration.py     # 7 tests
 │   ├── test_mcp_tools.py       # 7 tests
-│   ├── test_preparer_base.py   # 12 tests
 │   ├── test_sparse_builder.py  # 6 tests
 │   ├── test_retriever.py       # 8 tests
 │   └── test_server.py          # 9 tests
@@ -66,7 +54,6 @@ lore/
 │   │   ├── embedder.md
 │   │   ├── retriever.md
 │   │   ├── chunker.md
-│   │   ├── preparers.md
 │   │   ├── ingestion.md
 │   │   ├── server.md
 │   │   ├── config.md
@@ -91,10 +78,8 @@ lore/
 | `make rebuild` | Start container with fresh build |
 | `make down` | Stop container |
 | `make shell` | Bash shell inside container |
-| `make prepare-dry-run` | Show what preparers will do |
-| `make prepare` | Prepare all frameworks (source → prepared) |
-| `make prepare-spark` | Prepare Spark only |
-| `make prepare-delta` | Prepare Delta only |
+| `make prepare-spark` | Run pyspark-docs-extractor, copy to data/docs/spark/ |
+| `make prepare-delta` | Run delta-lake-docs-extractor, copy to data/docs/delta/ |
 | `make ingest` | Index documents (Qdrant dense + sparse) |
 | `make ingest-clear` | Clear collection, then reindex |
 | `make logs` | Container logs (follow) |
@@ -109,7 +94,7 @@ lore/
 | `EMBEDDING_DIM` | Embedding vector dimension | `384` |
 | `QDRANT_STORAGE_PATH` | Qdrant embedded storage path | `/data/qdrant_storage` |
 | `QDRANT_COLLECTION` | Qdrant collection name | `docs` |
-| `PREPARED_DIR` | Prepared docs path | `/data/prepared` |
+| `PREPARED_DIR` | Framework docs path | `/data/docs` |
 | `CHUNK_MAX_WORDS` | Max words per chunk | `800` |
 | `CHUNK_OVERLAP_WORDS` | Prose overlap words | `80` |
 | `PARENT_LEVEL` | Heading level for parent boundary | `2` |
@@ -126,7 +111,7 @@ lore/
 3. **Local embeddings** — FastEmbedEmbedder uses ONNX via fastembed, no external API or GPU needed
 4. **TF-IDF sparse vectors** — BM25-like keyword search via scikit-learn, native in Qdrant
 5. **Parent-child chunking** — small chunks for precision, parent content for context
-6. **Atomic preparer publish** — staging + rename, ingest always sees consistent snapshot
+6. **External extractors** — each framework's extraction logic lives in its own repo
 7. **Code-aware chunking** — code fences are atomic, heading chain in metadata
 
 ## REST API Endpoints
@@ -154,9 +139,9 @@ lore/
 
 ## Rules for Agents
 
-- **DO NOT** modify `data/source/` — it is read-only raw documentation
+- **DO NOT** modify `{framework}-docs-extractor/` from within `lore/` — they are separate repos
 - **DO NOT** run `make ingest` without confirmation — needs server stopped (Qdrant lock)
-- **ALWAYS** run `make prepare` before `make ingest` when source files change
+- **ALWAYS** run `make prepare-{framework}` before `make ingest` when extractor output changes
 - **ALWAYS** run `make test` after code changes
 - **ALWAYS** run `make ruff` after Python changes (`ruff check --fix`)
 - **ALWAYS** run `make ingest-clear` after chunking logic changes

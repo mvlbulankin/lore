@@ -28,7 +28,7 @@ python -m uvicorn app.server:app --host 0.0.0.0 --port 8000
 
 The `data` directory on the host contains:
 - `data/qdrant_storage/` — Qdrant embedded storage (vectors + sparse model)
-- `data/prepared/` — prepared documents
+- `data/docs/` — framework documentation (output of external extractors)
 - `data/hf_cache/` — HuggingFace model cache (populated on first server start)
 
 ## No External Dependencies
