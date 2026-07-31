@@ -29,7 +29,7 @@ make up
 
 Verify the extractor runs successfully from the workspace root:
 - Spark: `cd pyspark-docs-extractor && uv run python main.py`
-- Delta: `cd delta-lake-docs-extractor && uv run python main.py`
+- Delta: `cd delta-docs-extractor && uv run python main.py`
 
 ## After Chunking Update — Old Indexes Incompatible
 

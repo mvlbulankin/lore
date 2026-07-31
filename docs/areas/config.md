@@ -36,7 +36,7 @@ A `model_validator` ensures `chunk_overlap_words < chunk_max_words`. Invalid con
 | `docs_shared/sparse_builder.py` | none (standalone) |
 | `docs_shared/retriever.py` | `qdrant_storage_path`, `qdrant_collection`, `embedding_model`, `embedding_dim`, `search_fetch_multiplier`, `search_fetch_min` |
 | `app/server.py` | `snippet_max_chars`, `parent_content_max_chars`, `cors_origins` |
-| `delta-lake-docs-extractor/` | Not used (external, host-side) |
+| `delta-docs-extractor/` | Not used (external, host-side) |
 
 ## Additional Env Vars (not in Settings)
 

@@ -26,10 +26,10 @@ down:
 	docker compose down
 
 prepare-delta:
-	@echo "==> Running delta-lake-docs-extractor"
-	$(MAKE) -C $(WORKSPACE)/delta-lake-docs-extractor run
+	@echo "==> Running delta-docs-extractor"
+	$(MAKE) -C $(WORKSPACE)/delta-docs-extractor run
 	@mkdir -p $(DATA_DIR)/delta
-	@cp -r $(WORKSPACE)/delta-lake-docs-extractor/output/delta/* $(DATA_DIR)/delta/
+	@cp -r $(WORKSPACE)/delta-docs-extractor/output/delta/* $(DATA_DIR)/delta/
 
 prepare-spark:
 	@echo "==> Running spark-docs-extractor"
@@ -55,7 +55,7 @@ ruff:
 clean:
 	docker compose down -v
 	rm -rf $(DATA_DIR)/*
-	$(MAKE) -C $(WORKSPACE)/delta-lake-docs-extractor clean
+	$(MAKE) -C $(WORKSPACE)/delta-docs-extractor clean
 	$(MAKE) -C $(WORKSPACE)/spark-docs-extractor clean
 	rm -rf data/qdrant_storage/*
 	rm -rf data/hf_cache

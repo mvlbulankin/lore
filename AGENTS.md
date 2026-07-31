@@ -79,7 +79,7 @@ lore/
 | `make down` | Stop container |
 | `make shell` | Bash shell inside container |
 | `make prepare-spark` | Run pyspark-docs-extractor, copy to data/docs/spark/ |
-| `make prepare-delta` | Run delta-lake-docs-extractor, copy to data/docs/delta/ |
+| `make prepare-delta` | Run delta-docs-extractor, copy to data/docs/delta/ |
 | `make ingest` | Index documents (Qdrant dense + sparse) |
 | `make ingest-clear` | Clear collection, then reindex |
 | `make logs` | Container logs (follow) |

@@ -57,7 +57,7 @@ curl -X POST http://localhost:8000/search \
 | `make install` | Install dependencies |
 | `make up` | Start container |
 | `make down` | Stop container |
-| `make prepare-delta` | Run delta-lake-docs-extractor, copy to data/docs/delta/ |
+| `make prepare-delta` | Run delta-docs-extractor, copy to data/docs/delta/ |
 | `make prepare-spark` | Run spark-docs-extractor, copy to data/docs/spark/ |
 | `make ingest` | Index documents |
 | `make ingest-clear` | Clear collection and reindex |

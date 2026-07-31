@@ -7,7 +7,7 @@
       (host, uv)                (clean .md)       (docker)         (search index)
 ```
 
-1. **Extractors** — external repos (`delta-lake-docs-extractor/`, `pyspark-docs-extractor/`) fetch raw documentation and produce clean Markdown. Run on host via `uv`.
+1. **Extractors** — external repos (`delta-docs-extractor/`, `pyspark-docs-extractor/`) fetch raw documentation and produce clean Markdown. Run on host via `uv`.
 2. **Docs** — clean `.md` files in `data/docs/{framework}/`. Copied from extractor output by `make prepare-{framework}`.
 4. **Ingestion** — runs in Docker container: chunks, embeds locally (fastembed/ONNX), builds TF-IDF sparse vectors, upserts to Qdrant.
 5. **Search** — server queries Qdrant (dense + sparse vectors), fuses with server-side RRF, deduplicates by parent section.
